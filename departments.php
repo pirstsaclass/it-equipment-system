@@ -26,12 +26,13 @@ if (isset($_GET['action'])) {
 
 if ($_POST) {
     if (isset($_POST['add_department'])) {
-        $stmt = $db->prepare("INSERT INTO departments (name, building, floor, room, type, responsible_person) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt = $db->prepare("INSERT INTO departments (school, building, floor, room, name, type, responsible_person) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
-            $_POST['name'],
+            $_POST['school'],
             $_POST['building'],
             $_POST['floor'],
             $_POST['room'],
+            $_POST['name'],
             $_POST['type'],
             $_POST['responsible_person']
         ]);
@@ -41,12 +42,13 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_department'])) {
-        $stmt = $db->prepare("UPDATE departments SET name=?, building=?, floor=?, room=?, type=?, responsible_person=? WHERE id=?");
+        $stmt = $db->prepare("UPDATE departments SET school=?, building=?, floor=?, room=?, name=?, type=?, responsible_person=? WHERE id=?");
         $stmt->execute([
-            $_POST['name'],
+            $_POST['school'],
             $_POST['building'],
             $_POST['floor'],
             $_POST['room'],
+            $_POST['name'],
             $_POST['type'],
             $_POST['responsible_person'],
             $_POST['id']
@@ -58,7 +60,7 @@ if ($_POST) {
 }
 
 // Get departments list
-$departments_query = "SELECT * FROM departments ORDER BY name";
+$departments_query = "SELECT * FROM departments ORDER BY school, building, floor, name";
 $departments_list = $db->query($departments_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -100,10 +102,11 @@ include 'includes/sidebar.php';
                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th>ชื่อแผนก</th>
-                            <th>อาคาร</th>
+                            <th>โรงเรียน</th>
+                            <th>ตึก</th>
                             <th>ชั้น</th>
                             <th>ห้อง</th>
+                            <th>ชื่อแผนก</th>
                             <th>ประเภท</th>
                             <th>ผู้รับผิดชอบ</th>
                             <th>จัดการ</th>
@@ -112,10 +115,11 @@ include 'includes/sidebar.php';
                     <tbody>
                         <?php foreach($departments_list as $department): ?>
                         <tr>
-                            <td><?php echo $department['name']; ?></td>
+                            <td><?php echo $department['school']; ?></td>
                             <td><?php echo $department['building']; ?></td>
                             <td><?php echo $department['floor']; ?></td>
                             <td><?php echo $department['room']; ?></td>
+                            <td><?php echo $department['name']; ?></td>
                             <td><?php echo $department['type']; ?></td>
                             <td><?php echo $department['responsible_person']; ?></td>
                             <td>
@@ -149,8 +153,13 @@ include 'includes/sidebar.php';
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">ชื่อแผนก *</label>
-                            <input type="text" class="form-control" name="name" id="name" required>
+                            <label class="form-label">โรงเรียน *</label>
+                            <select class="form-control" name="school" id="school" required onchange="updateBuildings()">
+                                <option value="">เลือกโรงเรียน</option>
+                                <option value="โรงเรียนวารีเชียงใหม่">โรงเรียนวารีเชียงใหม่</option>
+                                <option value="โรงเรียนอนุบาลวารีเชียงใหม่">โรงเรียนอนุบาลวารีเชียงใหม่</option>
+                                <option value="โรงเรียนนานาชาติวารีเชียงใหม่">โรงเรียนนานาชาติวารีเชียงใหม่</option>
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">ประเภท *</label>
@@ -160,39 +169,39 @@ include 'includes/sidebar.php';
                                 <option value="อนุบาล">อนุบาล</option>
                                 <option value="ประถม">ประถม</option>
                                 <option value="มัธยม">มัธยม</option>
+                                <option value="สนับสนุน">สนับสนุน</option>
                             </select>
                         </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">อาคาร</label>
-                            <select class="form-control" name="building" id="building">
-                                <option value="">เลือกอาคาร</option>
-                                <?php for($i=1; $i<=10; $i++): ?>
-                                <option value="อาคาร <?php echo $i; ?>">อาคาร <?php echo $i; ?></option>
-                                <?php endfor; ?>
-                                <option value="Office">Office</option>
+                            <label class="form-label">ตึก *</label>
+                            <select class="form-control" name="building" id="building" required onchange="updateFloors()">
+                                <option value="">เลือกตึก</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">ชั้น</label>
-                            <select class="form-control" name="floor" id="floor">
+                            <label class="form-label">ชั้น *</label>
+                            <select class="form-control" name="floor" id="floor" required>
                                 <option value="">เลือกชั้น</option>
-                                <?php for($i=1; $i<=7; $i++): ?>
-                                <option value="ชั้น <?php echo $i; ?>">ชั้น <?php echo $i; ?></option>
-                                <?php endfor; ?>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">ห้อง</label>
-                            <input type="text" class="form-control" name="room" id="room">
+                            <label class="form-label">ชื่อ/เลขห้อง *</label>
+                            <input type="text" class="form-control" name="room" id="room" required>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">ผู้รับผิดชอบ</label>
-                        <input type="text" class="form-control" name="responsible_person" id="responsible_person">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">ชื่อแผนก *</label>
+                            <input type="text" class="form-control" name="name" id="name" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">ผู้รับผิดชอบ</label>
+                            <input type="text" class="form-control" name="responsible_person" id="responsible_person">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -205,26 +214,118 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
+// ข้อมูลโรงเรียน ตึก และชั้น
+const schoolData = {
+    "โรงเรียนวารีเชียงใหม่": {
+        buildings: [
+            { name: "ตึก1-อำนวยการ", floors: ["1", "2"] },
+            { name: "ตึก3-ประถม", floors: ["1", "2", "3", "4"] },
+            { name: "ตึก4-ประถม", floors: ["1", "2", "3"] },
+            { name: "ตึก4-มัธยม", floors: ["3", "4", "5"] },
+            { name: "ตึก5-อนุบาล", floors: ["1", "2"] },
+            { name: "ตึก6", floors: ["1", "2"] },
+            { name: "ตึก7-มัธยม", floors: ["1", "2", "3", "4", "5", "6", "7"] },
+            { name: "ตึก10", floors: ["1", "2"] }
+        ]
+    },
+    "โรงเรียนอนุบาลวารีเชียงใหม่": {
+        buildings: [
+            { name: "ตึก1-อำนวยการ", floors: ["1", "2"] },
+            { name: "ตึก6", floors: ["1", "2"] }
+        ]
+    },
+    "โรงเรียนนานาชาติวารีเชียงใหม่": {
+        buildings: [
+            { name: "ตึก8", floors: ["1", "2", "3", "4"] },
+            { name: "ตึก9", floors: ["1", "2", "3"] },
+            { name: "ตึก10", floors: ["1", "2"] }
+        ]
+    }
+};
+
 function clearForm() {
     document.getElementById('departmentForm').reset();
     document.getElementById('department_id').value = '';
     document.getElementById('departmentModalLabel').textContent = 'เพิ่มแผนก';
     document.getElementById('submitBtn').name = 'add_department';
     document.getElementById('submitBtn').textContent = 'บันทึก';
+    
+    // ล้าง dropdown ตึกและชั้น
+    document.getElementById('building').innerHTML = '<option value="">เลือกตึก</option>';
+    document.getElementById('floor').innerHTML = '<option value="">เลือกชั้น</option>';
 }
 
 function editDepartment(department) {
     document.getElementById('department_id').value = department.id;
-    document.getElementById('name').value = department.name;
+    document.getElementById('school').value = department.school || '';
     document.getElementById('type').value = department.type || '';
-    document.getElementById('building').value = department.building || '';
-    document.getElementById('floor').value = department.floor || '';
+    document.getElementById('name').value = department.name || '';
     document.getElementById('room').value = department.room || '';
     document.getElementById('responsible_person').value = department.responsible_person || '';
+    
+    // อัปเดตตึกและชั้นตามโรงเรียน
+    updateBuildings();
+    document.getElementById('building').value = department.building || '';
+    
+    // รอสักครู่แล้วอัปเดตชั้น
+    setTimeout(() => {
+        updateFloors();
+        document.getElementById('floor').value = department.floor || '';
+    }, 100);
     
     document.getElementById('departmentModalLabel').textContent = 'แก้ไขข้อมูลแผนก';
     document.getElementById('submitBtn').name = 'edit_department';
     document.getElementById('submitBtn').textContent = 'อัพเดท';
+}
+
+// อัปเดตตึกตามโรงเรียนที่เลือก
+function updateBuildings() {
+    const schoolSelect = document.getElementById('school');
+    const buildingSelect = document.getElementById('building');
+    const floorSelect = document.getElementById('floor');
+    
+    // ล้าง dropdown ตึกและชั้น
+    buildingSelect.innerHTML = '<option value="">เลือกตึก</option>';
+    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
+    
+    const selectedSchool = schoolSelect.value;
+    if (selectedSchool && schoolData[selectedSchool]) {
+        // เพิ่มตึกตามโรงเรียนที่เลือก
+        schoolData[selectedSchool].buildings.forEach(building => {
+            const option = document.createElement('option');
+            option.value = building.name;
+            option.textContent = building.name;
+            buildingSelect.appendChild(option);
+        });
+    }
+}
+
+// อัปเดตชั้นตามตึกที่เลือก
+function updateFloors() {
+    const schoolSelect = document.getElementById('school');
+    const buildingSelect = document.getElementById('building');
+    const floorSelect = document.getElementById('floor');
+    
+    // ล้าง dropdown ชั้น
+    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
+    
+    const selectedSchool = schoolSelect.value;
+    const selectedBuilding = buildingSelect.value;
+    
+    if (selectedSchool && selectedBuilding && schoolData[selectedSchool]) {
+        // หาข้อมูลตึกที่เลือก
+        const building = schoolData[selectedSchool].buildings.find(b => b.name === selectedBuilding);
+        
+        if (building) {
+            // เพิ่มชั้นตามตึกที่เลือก
+            building.floors.forEach(floor => {
+                const option = document.createElement('option');
+                option.value = `ชั้น ${floor}`;
+                option.textContent = `ชั้น ${floor}`;
+                floorSelect.appendChild(option);
+            });
+        }
+    }
 }
 
 $(document).ready(function() {

@@ -95,6 +95,30 @@ INSERT INTO departments (name, building, floor, room, type, responsible_person) 
 ('ระดับประถม', 'อาคาร 3', '1', '102', 'ประถม', 'นายธีรภัทร กล้าหาญ'),
 ('ระดับมัธยม', 'อาคาร 4', '2', '202', 'มัธยม', 'นายสมชาย ใจกว้าง');
 
+-- หากมีตาราง departments อยู่แล้ว ให้เพิ่มคอลัมน์ school
+ALTER TABLE departments ADD COLUMN school VARCHAR(255) AFTER id;
+
+-- หรือสร้างตารางใหม่
+CREATE TABLE departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    school VARCHAR(255) NOT NULL,
+    building VARCHAR(255) NOT NULL,
+    floor VARCHAR(255) NOT NULL,
+    room VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(255) NOT NULL,
+    responsible_person VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ตัวอย่างข้อมูล
+INSERT INTO departments (school, building, floor, room, name, type, responsible_person) VALUES
+('โรงเรียนวารีเชียงใหม่', 'ตึก1-อำนวยการ', 'ชั้น 1', '101', 'ฝ่ายบริหาร', 'อำนวยการ', 'ผู้บริหาร'),
+('โรงเรียนวารีเชียงใหม่', 'ตึก3-ประถม', 'ชั้น 2', '201', 'ห้องเรียนประถมปีที่ 1', 'ประถม', 'ครูสมศรี'),
+('โรงเรียนอนุบาลวารีเชียงใหม่', 'ตึก1-อำนวยการ', 'ชั้น 1', '102', 'ฝ่ายธุรการ', 'อำนวยการ', 'เจ้าหน้าที่ธุรการ'),
+('โรงเรียนนานาชาติวารีเชียงใหม่', 'ตึก8', 'ชั้น 3', '301', 'ห้องวิทยาศาสตร์', 'มัธยม', 'ครูต่างชาติ');
+
 INSERT INTO categories (name, description) VALUES
 ('คอมพิวเตอร์', 'คอมพิวเตอร์ตั้งโต๊ะและอุปกรณ์เกี่ยวข้อง'),
 ('โน๊ตบุ๊ค', 'คอมพิวเตอร์พกพา'),

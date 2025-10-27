@@ -13,7 +13,7 @@ if (isset($_GET['action'])) {
         $equipment = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($equipment && $equipment['image']) {
-            $image_path = 'uploads/equipment/' . $equipment['image'];
+            $image_path = 'uploads/img_equipment/' . $equipment['image'];
             if (file_exists($image_path)) {
                 unlink($image_path);
             }
@@ -32,15 +32,21 @@ if ($_POST) {
         // Handle image upload
         $image_filename = null;
         if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-            $upload_dir = 'uploads/equipment/';
+            $upload_dir = 'uploads/img_equipment/';
             if (!file_exists($upload_dir)) {
                 mkdir($upload_dir, 0777, true);
             }
             
-            // ใช้รหัสครุภัณฑ์เป็นชื่อไฟล์
+            // ใช้รหัสครุภัณฑ์และชื่อครุภัณฑ์เป็นชื่อไฟล์
             $equipment_code = $_POST['code'];
+            $equipment_name = $_POST['name'];
+            
+            // ทำความสะอาดชื่อไฟล์ (ลบอักขระพิษ)
+            $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
+            $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
+            
             $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-            $file_name = $equipment_code . '_' . time() . '.' . $file_extension;
+            $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
             $image_path = $upload_dir . $file_name;
             
             // ตรวจสอบประเภทไฟล์
@@ -92,21 +98,27 @@ if ($_POST) {
         if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
             // Delete old image
             if ($image_filename) {
-                $old_image_path = 'uploads/equipment/' . $image_filename;
+                $old_image_path = 'uploads/img_equipment/' . $image_filename;
                 if (file_exists($old_image_path)) {
                     unlink($old_image_path);
                 }
             }
             
-            $upload_dir = 'uploads/equipment/';
+            $upload_dir = 'uploads/img_equipment/';
             if (!file_exists($upload_dir)) {
                 mkdir($upload_dir, 0777, true);
             }
             
-            // ใช้รหัสครุภัณฑ์เป็นชื่อไฟล์
+            // ใช้รหัสครุภัณฑ์และชื่อครุภัณฑ์เป็นชื่อไฟล์
             $equipment_code = $_POST['code'];
+            $equipment_name = $_POST['name'];
+            
+            // ทำความสะอาดชื่อไฟล์ (ลบอักขระพิษ)
+            $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
+            $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
+            
             $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-            $file_name = $equipment_code . '_' . time() . '.' . $file_extension;
+            $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
             $image_path = $upload_dir . $file_name;
             
             // ตรวจสอบประเภทไฟล์
@@ -286,7 +298,7 @@ include 'includes/sidebar.php';
                             </button>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label fw-bold">แผนก</label>
                         <select class="form-control" name="department" onchange="this.form.submit()">
                             <option value="">-- ทุกแผนก --</option>
@@ -309,8 +321,19 @@ include 'includes/sidebar.php';
                         </select>
                     </div>
                     
+                    <!-- Dropdown เลือกจำนวนรายการต่อหน้า -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">แสดงต่อหน้า</label>
+                        <select class="form-control" name="per_page" onchange="this.form.submit()">
+                            <option value="10" <?php echo ($records_per_page == 10) ? 'selected' : ''; ?>>10 รายการ</option>
+                            <option value="20" <?php echo ($records_per_page == 20) ? 'selected' : ''; ?>>20 รายการ</option>
+                            <option value="50" <?php echo ($records_per_page == 50) ? 'selected' : ''; ?>>50 รายการ</option>
+                            <option value="100" <?php echo ($records_per_page == 100) ? 'selected' : ''; ?>>100 รายการ</option>
+                        </select>
+                    </div>
+                    
                     <div class="col-md-1">
-                        <?php if (!empty($search) || !empty($filter_department) || !empty($filter_status)): ?>
+                        <?php if (!empty($search) || !empty($filter_department) || !empty($filter_status) || $records_per_page != 20): ?>
                             <a href="equipment.php" class="btn btn-secondary w-100" title="ล้างการค้นหา">
                                 <i class="fas fa-redo"></i>
                             </a>
@@ -320,6 +343,12 @@ include 'includes/sidebar.php';
                 <!-- Keep hidden inputs for persistence -->
                 <?php if (!empty($search)): ?>
                     <input type="hidden" name="search" value="<?php echo htmlspecialchars($search); ?>">
+                <?php endif; ?>
+                <?php if (!empty($filter_department)): ?>
+                    <input type="hidden" name="department" value="<?php echo $filter_department; ?>">
+                <?php endif; ?>
+                <?php if (!empty($filter_status)): ?>
+                    <input type="hidden" name="status" value="<?php echo $filter_status; ?>">
                 <?php endif; ?>
             </form>
 
@@ -351,43 +380,45 @@ include 'includes/sidebar.php';
                 <div class="text-muted">
                     แสดง <?php echo number_format($offset + 1); ?>-<?php echo number_format(min($offset + $records_per_page, $total_records)); ?> 
                     จาก <?php echo number_format($total_records); ?> รายการ
+                    <?php if ($total_pages > 1): ?>
+                        | หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?>
+                    <?php endif; ?>
                 </div>
+                
+                <!-- Dropdown เลือกหน้า (สำหรับหน้าจอเล็ก) -->
+                <?php if ($total_pages > 1): ?>
+                <div class="d-md-none">
+                    <select class="form-select form-select-sm" onchange="window.location.href=this.value">
+                        <option value="">เลือกหน้า...</option>
+                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                            <option value="<?php echo getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page); ?>" 
+                                <?php echo ($i == $current_page) ? 'selected' : ''; ?>>
+                                หน้า <?php echo $i; ?>
+                            </option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
             </div>
 
             <div class="table-responsive">
                 <table class="table table-bordered table-hover" width="100%" cellspacing="0">
                     <thead class="table-light">
                         <tr>
-                            <th width="8%">รูปภาพ</th>
-                            <th width="10%">รหัสครุภัณฑ์</th>
-                            <th width="15%">ชื่ออุปกรณ์</th>
-                            <th width="12%">หมวดหมู่</th>
-                            <th width="12%">รายการอุปกรณ์</th>
-                            <th width="12%">แผนก</th>
-                            <th width="8%">สถานะ</th>
-                            <th width="8%">วันที่จัดซื้อ</th>
-                            <th width="15%">จัดการ</th>
+                            <th width="12%">รหัสครุภัณฑ์</th>
+                            <th width="18%">ชื่ออุปกรณ์</th>
+                            <th width="14%">หมวดหมู่</th>
+                            <th width="14%">รายการอุปกรณ์</th>
+                            <th width="14%">แผนก</th>
+                            <th width="10%">สถานะ</th>
+                            <th width="10%">วันที่จัดซื้อ</th>
+                            <th width="18%">จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (count($equipment_list) > 0): ?>
                             <?php foreach($equipment_list as $equipment): ?>
                             <tr>
-                                <td class="text-center">
-                                    <?php if ($equipment['image']): ?>
-                                        <img src="uploads/equipment/<?php echo $equipment['image']; ?>" 
-                                             alt="<?php echo $equipment['name']; ?>" 
-                                             class="img-thumbnail" 
-                                             style="width: 60px; height: 60px; object-fit: cover;"
-                                             data-bs-toggle="tooltip" 
-                                             title="คลิกเพื่อดูรูปขนาดใหญ่"
-                                             onclick="showImageModal('<?php echo $equipment['image']; ?>', '<?php echo $equipment['name']; ?>')">
-                                    <?php else: ?>
-                                        <div class="text-muted" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border: 1px solid #dee2e6;">
-                                            <i class="fas fa-image fa-lg"></i>
-                                        </div>
-                                    <?php endif; ?>
-                                </td>
                                 <td class="fw-bold text-primary"><?php echo $equipment['code']; ?></td>
                                 <td><?php echo $equipment['name']; ?></td>
                                 <td>
@@ -418,7 +449,7 @@ include 'includes/sidebar.php';
                                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick='editEquipment(<?php echo json_encode($equipment); ?>)' title="แก้ไข">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <a href="equipment.php?action=delete&id=<?php echo $equipment['id']; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?><?php echo !empty($filter_department) ? '&department='.$filter_department : ''; ?><?php echo !empty($filter_status) ? '&status='.$filter_status : ''; ?><?php echo ($records_per_page != 20) ? '&per_page='.$records_per_page : ''; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
+                                        <a href="equipment.php?action=delete&id=<?php echo $equipment['id']; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?><?php echo !empty($filter_department) ? '&department='.$filter_department : ''; ?><?php echo !empty($filter_status) ? '&status='.$filter_status : ''; ?><?php echo ($records_per_page != 20) ? '&per_page='.$records_per_page : ''; ?><?php echo ($current_page > 1) ? '&page='.$current_page : ''; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -427,7 +458,7 @@ include 'includes/sidebar.php';
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="9" class="text-center py-4">
+                                <td colspan="8" class="text-center py-4">
                                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                     <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์</h5>
                                     <?php if (!empty($search) || !empty($filter_department) || !empty($filter_status)): ?>
@@ -445,46 +476,88 @@ include 'includes/sidebar.php';
             <!-- Pagination -->
             <?php if ($total_pages > 1): ?>
             <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center">
-                    <!-- Previous Page -->
-                    <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo getPageUrl($current_page - 1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Previous">
-                            <span aria-hidden="true">&laquo;</span>
-                        </a>
-                    </li>
+                <div class="d-flex justify-content-between align-items-center">
+                    <!-- ข้อมูลสรุป -->
+                    <div class="text-muted small d-none d-md-block">
+                        หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?> 
+                        (ทั้งหมด <?php echo number_format($total_records); ?> รายการ)
+                    </div>
+                    
+                    <!-- Pagination Links -->
+                    <ul class="pagination justify-content-center mb-0">
+                        <!-- First Page -->
+                        <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="<?php echo getPageUrl(1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="First">
+                                <span aria-hidden="true">&laquo;&laquo;</span>
+                            </a>
+                        </li>
+                        
+                        <!-- Previous Page -->
+                        <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="<?php echo getPageUrl($current_page - 1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
 
-                    <!-- Page Numbers -->
-                    <?php
-                    $start_page = max(1, $current_page - 2);
-                    $end_page = min($total_pages, $current_page + 2);
-                    
-                    if ($start_page > 1) {
-                        echo '<li class="page-item"><a class="page-link" href="' . getPageUrl(1, $search, $filter_department, $filter_status, $records_per_page) . '">1</a></li>';
-                        if ($start_page > 2) {
-                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        <!-- Page Numbers -->
+                        <?php
+                        // คำนวณช่วงหน้าที่จะแสดง
+                        $start_page = max(1, $current_page - 2);
+                        $end_page = min($total_pages, $current_page + 2);
+                        
+                        // แสดง ... หน้าหากไม่เริ่มจากหน้า 1
+                        if ($start_page > 1) {
+                            echo '<li class="page-item"><a class="page-link" href="' . getPageUrl(1, $search, $filter_department, $filter_status, $records_per_page) . '">1</a></li>';
+                            if ($start_page > 2) {
+                                echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                            }
                         }
-                    }
-                    
-                    for ($i = $start_page; $i <= $end_page; $i++) {
-                        $active = $i == $current_page ? 'active' : '';
-                        echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page) . '">' . $i . '</a></li>';
-                    }
-                    
-                    if ($end_page < $total_pages) {
-                        if ($end_page < $total_pages - 1) {
-                            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                        
+                        // แสดงเลขหน้า
+                        for ($i = $start_page; $i <= $end_page; $i++) {
+                            $active = $i == $current_page ? 'active' : '';
+                            echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page) . '">' . $i . '</a></li>';
                         }
-                        echo '<li class="page-item"><a class="page-link" href="' . getPageUrl($total_pages, $search, $filter_department, $filter_status, $records_per_page) . '">' . $total_pages . '</a></li>';
-                    }
-                    ?>
+                        
+                        // แสดง ... หลังหากไม่จบที่หน้าสุดท้าย
+                        if ($end_page < $total_pages) {
+                            if ($end_page < $total_pages - 1) {
+                                echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                            }
+                            echo '<li class="page-item"><a class="page-link" href="' . getPageUrl($total_pages, $search, $filter_department, $filter_status, $records_per_page) . '">' . $total_pages . '</a></li>';
+                        }
+                        ?>
 
-                    <!-- Next Page -->
-                    <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo getPageUrl($current_page + 1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Next">
-                            <span aria-hidden="true">&raquo;</span>
-                        </a>
-                    </li>
-                </ul>
+                        <!-- Next Page -->
+                        <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="<?php echo getPageUrl($current_page + 1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        
+                        <!-- Last Page -->
+                        <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                            <a class="page-link" href="<?php echo getPageUrl($total_pages, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Last">
+                                <span aria-hidden="true">&raquo;&raquo;</span>
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <!-- Dropdown เลือกหน้า (สำหรับหน้าจอใหญ่) -->
+                    <div class="d-none d-md-block">
+                        <div class="input-group input-group-sm" style="width: 120px;">
+                            <span class="input-group-text">หน้า</span>
+                            <select class="form-select" onchange="window.location.href=this.value">
+                                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                    <option value="<?php echo getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page); ?>" 
+                                        <?php echo ($i == $current_page) ? 'selected' : ''; ?>>
+                                        <?php echo $i; ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </nav>
             <?php endif; ?>
         </div>
@@ -627,7 +700,7 @@ include 'includes/sidebar.php';
 
 <!-- View Equipment Modal -->
 <div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="viewModalLabel">รายละเอียดครุภัณฑ์</h5>
@@ -635,88 +708,79 @@ include 'includes/sidebar.php';
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <div class="col-md-4 text-center mb-3">
-                        <img id="viewImage" src="" alt="Equipment Image" class="img-fluid rounded border" style="max-height: 300px; display: none;">
-                        <div id="viewNoImage" class="border rounded p-5 bg-light">
-                            <i class="fas fa-image fa-3x text-muted"></i>
-                            <p class="text-muted mt-2 mb-0">ไม่มีรูปภาพ</p>
+                    <!-- รูปภาพครุภัณฑ์ - แสดงเฉพาะในโมดอลรายละเอียด -->
+                    <div class="col-md-4 text-center mb-4">
+                        <div id="viewImageContainer">
+                            <img id="viewImage" src="" alt="Equipment Image" class="img-fluid rounded border shadow" style="max-height: 300px; display: none;">
+                            <div id="viewNoImage" class="border rounded p-5 bg-light">
+                                <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                                <p class="text-muted mt-2 mb-0">ไม่มีรูปภาพ</p>
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- รายละเอียดครุภัณฑ์ -->
                     <div class="col-md-8">
-                        <table class="table table-bordered">
-                            <tr>
-                                <th width="30%" class="bg-light">รหัสครุภัณฑ์</th>
-                                <td id="viewCode"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">ชื่ออุปกรณ์</th>
-                                <td id="viewName"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">หมวดหมู่</th>
-                                <td id="viewCategory"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">รายการอุปกรณ์</th>
-                                <td id="viewItem"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">ยี่ห้อ</th>
-                                <td id="viewBrand"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">รุ่น</th>
-                                <td id="viewModel"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">หมายเลขซีเรียล</th>
-                                <td id="viewSerial"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">วันที่จัดซื้อ</th>
-                                <td id="viewPurchaseDate"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">ราคาจัดซื้อ</th>
-                                <td id="viewPurchasePrice"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">แผนก</th>
-                                <td id="viewDepartment"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">ผู้รับผิดชอบ</th>
-                                <td id="viewResponsible"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">สถานะ</th>
-                                <td id="viewStatus"></td>
-                            </tr>
-                            <tr>
-                                <th class="bg-light">รายละเอียดคุณสมบัติ</th>
-                                <td id="viewSpecifications"></td>
-                            </tr>
-                        </table>
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h4 class="text-primary" id="viewName"></h4>
+                                <h6 class="text-muted">รหัสครุภัณฑ์: <span id="viewCode" class="fw-bold"></span></h6>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <tr>
+                                    <th width="35%" class="bg-light">หมวดหมู่</th>
+                                    <td id="viewCategory">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">รายการอุปกรณ์</th>
+                                    <td id="viewItem">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">ยี่ห้อ</th>
+                                    <td id="viewBrand">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">รุ่น</th>
+                                    <td id="viewModel">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">หมายเลขซีเรียล</th>
+                                    <td id="viewSerial">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">วันที่จัดซื้อ</th>
+                                    <td id="viewPurchaseDate">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">ราคาจัดซื้อ</th>
+                                    <td id="viewPurchasePrice">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">แผนก</th>
+                                    <td id="viewDepartment">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">ผู้รับผิดชอบ</th>
+                                    <td id="viewResponsible">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">สถานะ</th>
+                                    <td id="viewStatus">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">รายละเอียดคุณสมบัติ</th>
+                                    <td id="viewSpecifications">-</td>
+                                </tr>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Image Preview Modal -->
-<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="imagePreviewTitle">รูปภาพครุภัณฑ์</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center">
-                <img id="previewImage" src="" alt="" class="img-fluid">
             </div>
         </div>
     </div>
@@ -762,7 +826,7 @@ function editEquipment(equipment) {
     
     // Show image preview if exists
     if (equipment.image) {
-        document.getElementById('imagePreview').src = 'uploads/equipment/' + equipment.image;
+        document.getElementById('imagePreview').src = 'uploads/img_equipment/' + equipment.image;
         document.getElementById('imagePreview').style.display = 'block';
         document.getElementById('noImagePlaceholder').style.display = 'none';
     } else {
@@ -775,17 +839,19 @@ function editEquipment(equipment) {
     document.getElementById('submitBtn').textContent = 'อัพเดท';
 }
 
-// View equipment function
+// View equipment function - แสดงรูปภาพเฉพาะในโมดอลรายละเอียด
 function viewEquipment(equipment) {
-    document.getElementById('viewCode').textContent = equipment.code;
+    // ตั้งค่าข้อมูลพื้นฐาน
     document.getElementById('viewName').textContent = equipment.name;
+    document.getElementById('viewCode').textContent = equipment.code;
     document.getElementById('viewCategory').textContent = equipment.category_name || '-';
     document.getElementById('viewItem').textContent = equipment.item_name || '-';
     document.getElementById('viewBrand').textContent = equipment.brand || '-';
     document.getElementById('viewModel').textContent = equipment.model || '-';
     document.getElementById('viewSerial').textContent = equipment.serial_number || '-';
     document.getElementById('viewPurchaseDate').textContent = equipment.purchase_date || '-';
-    document.getElementById('viewPurchasePrice').textContent = equipment.purchase_price ? parseFloat(equipment.purchase_price).toLocaleString('th-TH', {minimumFractionDigits: 2}) + ' บาท' : '-';
+    document.getElementById('viewPurchasePrice').textContent = equipment.purchase_price ? 
+        parseFloat(equipment.purchase_price).toLocaleString('th-TH', {minimumFractionDigits: 2}) + ' บาท' : '-';
     document.getElementById('viewDepartment').textContent = equipment.department_name || '-';
     document.getElementById('viewResponsible').textContent = equipment.responsible_person || '-';
     document.getElementById('viewSpecifications').textContent = equipment.specifications || '-';
@@ -801,11 +867,16 @@ function viewEquipment(equipment) {
     const badgeClass = statusBadges[equipment.status] || 'secondary';
     document.getElementById('viewStatus').innerHTML = `<span class="badge bg-${badgeClass}">${equipment.status}</span>`;
     
-    // Show image or placeholder
+    // จัดการแสดงรูปภาพ - แสดงเฉพาะในโมดอลรายละเอียด
     if (equipment.image) {
-        document.getElementById('viewImage').src = 'uploads/equipment/' + equipment.image;
+        document.getElementById('viewImage').src = 'uploads/img_equipment/' + equipment.image;
         document.getElementById('viewImage').style.display = 'block';
         document.getElementById('viewNoImage').style.display = 'none';
+        document.getElementById('viewImage').onerror = function() {
+            // หากโหลดรูปภาพไม่สำเร็จ ให้แสดง placeholder
+            this.style.display = 'none';
+            document.getElementById('viewNoImage').style.display = 'block';
+        };
     } else {
         document.getElementById('viewImage').style.display = 'none';
         document.getElementById('viewNoImage').style.display = 'block';
@@ -826,34 +897,53 @@ function previewImage(event) {
     }
 }
 
-// Function to show image in modal
-function showImageModal(imageName, equipmentName) {
-    if (imageName) {
-        $('#previewImage').attr('src', 'uploads/equipment/' + imageName);
-        $('#imagePreviewTitle').text('รูปภาพ: ' + equipmentName);
-        $('#imagePreviewModal').modal('show');
-    }
-}
-
-// Function to load category items
+// Function to load category items - แก้ไขปัญหา "undefined"
 function loadCategoryItems(categoryId, selectedItemId = null) {
     if (categoryId) {
-        fetch('ajax_get_items.php?category_id=' + categoryId)
+        fetch('get_category_items.php?category_id=' + categoryId)
             .then(response => response.json())
             .then(data => {
                 const itemSelect = document.getElementById('category_item_id');
                 itemSelect.innerHTML = '<option value="">เลือกรายการอุปกรณ์</option>';
                 data.forEach(item => {
+                    // ใช้ชื่ออย่างเดียวแทนที่จะแสดงรหัส เพื่อหลีกเลี่ยงปัญหา "undefined"
+                    const optionText = item.name;
                     const selected = selectedItemId && item.id == selectedItemId ? 'selected' : '';
-                    itemSelect.innerHTML += `<option value="${item.id}" ${selected}>${item.name}</option>`;
+                    itemSelect.innerHTML += `<option value="${item.id}" ${selected}>${optionText}</option>`;
                 });
             })
             .catch(error => {
                 console.error('Error:', error);
+                document.getElementById('category_item_id').innerHTML = '<option value="">เลือกรายการอุปกรณ์</option>';
             });
     } else {
         document.getElementById('category_item_id').innerHTML = '<option value="">เลือกรายการอุปกรณ์</option>';
     }
+}
+
+// เมื่อโมดอลปิด ให้รีเซ็ตรูปภาพ
+document.addEventListener('DOMContentLoaded', function() {
+    var viewModal = document.getElementById('viewModal');
+    viewModal.addEventListener('hidden.bs.modal', function () {
+        document.getElementById('viewImage').src = '';
+        document.getElementById('viewImage').style.display = 'none';
+        document.getElementById('viewNoImage').style.display = 'block';
+    });
+});
+
+// Function สำหรับการเปลี่ยนหน้าแบบเร็ว
+function goToPage(page) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', page);
+    window.location.href = url.toString();
+}
+
+// Function สำหรับเปลี่ยนจำนวนรายการต่อหน้า
+function changePerPage(perPage) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('page', 1); // กลับไปหน้าที่ 1 เมื่อเปลี่ยนจำนวนต่อหน้า
+    window.location.href = url.toString();
 }
 </script>
 

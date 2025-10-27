@@ -94,14 +94,6 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get employees for dropdown
 $employees = $db->query("SELECT * FROM employees ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
-
-// Get user for edit
-$edit_user = null;
-if (isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET['id'])) {
-    $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->execute([$_GET['id']]);
-    $edit_user = $stmt->fetch(PDO::FETCH_ASSOC);
-}
 ?>
 
 <?php 
@@ -114,7 +106,7 @@ include 'includes/sidebar.php';
 
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">จัดการข้อมูลผู้ใช้</h1>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="clearForm()">
             <i class="fas fa-plus"></i> เพิ่มผู้ใช้
         </button>
     </div>
@@ -179,9 +171,9 @@ include 'includes/sidebar.php';
                                 <?php echo $user['last_login'] ? date('d/m/Y H:i', strtotime($user['last_login'])) : 'ยังไม่เคยเข้าสู่ระบบ'; ?>
                             </td>
                             <td>
-                                <a href="users.php?action=edit&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-primary">
+                                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
                                     <i class="fas fa-edit"></i>
-                                </a>
+                                </button>
                                 <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                     <a href="users.php?action=delete&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                         <i class="fas fa-trash"></i>
@@ -202,33 +194,30 @@ include 'includes/sidebar.php';
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="userModalLabel">
-                    <?php echo $edit_user ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้'; ?>
-                </h5>
+                <h5 class="modal-title" id="userModalLabel">เพิ่มผู้ใช้</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST">
+            <form method="POST" id="userForm">
                 <div class="modal-body">
-                    <?php if ($edit_user): ?>
-                        <input type="hidden" name="id" value="<?php echo $edit_user['id']; ?>">
-                    <?php endif; ?>
+                    <input type="hidden" name="id" id="user_id">
                     
                     <div class="mb-3">
                         <label class="form-label">ชื่อผู้ใช้ *</label>
-                        <input type="text" class="form-control" name="username" value="<?php echo $edit_user ? $edit_user['username'] : ''; ?>" required>
+                        <input type="text" class="form-control" name="username" id="username" required>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">รหัสผ่าน <?php echo $edit_user ? '(เว้นว่างหากไม่ต้องการเปลี่ยน)' : '*'; ?></label>
-                        <input type="password" class="form-control" name="password" <?php echo $edit_user ? '' : 'required'; ?>>
+                        <label class="form-label" id="passwordLabel">รหัสผ่าน *</label>
+                        <input type="password" class="form-control" name="password" id="password" required>
+                        <small class="text-muted" id="passwordHelp" style="display: none;">เว้นว่างหากไม่ต้องการเปลี่ยนรหัสผ่าน</small>
                     </div>
                     
                     <div class="mb-3">
                         <label class="form-label">พนักงาน</label>
-                        <select class="form-control" name="employee_id">
+                        <select class="form-control" name="employee_id" id="employee_id">
                             <option value="">ไม่ผูกกับพนักงาน</option>
                             <?php foreach($employees as $employee): ?>
-                            <option value="<?php echo $employee['id']; ?>" <?php echo ($edit_user && $edit_user['employee_id'] == $employee['id']) ? 'selected' : ''; ?>>
+                            <option value="<?php echo $employee['id']; ?>">
                                 <?php echo $employee['employee_code'] . ' - ' . $employee['first_name'] . ' ' . $employee['last_name']; ?>
                             </option>
                             <?php endforeach; ?>
@@ -237,23 +226,21 @@ include 'includes/sidebar.php';
                     
                     <div class="mb-3">
                         <label class="form-label">สิทธิ์การใช้งาน *</label>
-                        <select class="form-control" name="role" required>
-                            <option value="user" <?php echo ($edit_user && $edit_user['role'] == 'user') ? 'selected' : ''; ?>>User</option>
-                            <option value="admin" <?php echo ($edit_user && $edit_user['role'] == 'admin') ? 'selected' : ''; ?>>Admin</option>
-                            <option value="viewer" <?php echo ($edit_user && $edit_user['role'] == 'viewer') ? 'selected' : ''; ?>>Viewer</option>
+                        <select class="form-control" name="role" id="role" required>
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer</option>
                         </select>
                     </div>
                     
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" name="is_active" id="is_active" <?php echo ($edit_user && $edit_user['is_active']) || !$edit_user ? 'checked' : ''; ?>>
+                        <input type="checkbox" class="form-check-input" name="is_active" id="is_active" checked>
                         <label class="form-check-label" for="is_active">เปิดใช้งานบัญชี</label>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
-                    <button type="submit" name="<?php echo $edit_user ? 'edit_user' : 'add_user'; ?>" class="btn btn-primary">
-                        <?php echo $edit_user ? 'อัพเดท' : 'บันทึก'; ?>
-                    </button>
+                    <button type="submit" name="add_user" id="submitBtn" class="btn btn-primary">บันทึก</button>
                 </div>
             </form>
         </div>
@@ -261,11 +248,37 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
-<?php if ($edit_user): ?>
-    $(document).ready(function() {
-        $('#userModal').modal('show');
-    });
-<?php endif; ?>
+function clearForm() {
+    document.getElementById('userForm').reset();
+    document.getElementById('user_id').value = '';
+    document.getElementById('userModalLabel').textContent = 'เพิ่มผู้ใช้';
+    document.getElementById('submitBtn').name = 'add_user';
+    document.getElementById('submitBtn').textContent = 'บันทึก';
+    
+    // Reset password field
+    document.getElementById('password').required = true;
+    document.getElementById('passwordLabel').textContent = 'รหัสผ่าน *';
+    document.getElementById('passwordHelp').style.display = 'none';
+    document.getElementById('is_active').checked = true;
+}
+
+function editUser(user) {
+    document.getElementById('user_id').value = user.id;
+    document.getElementById('username').value = user.username;
+    document.getElementById('password').value = '';
+    document.getElementById('employee_id').value = user.employee_id || '';
+    document.getElementById('role').value = user.role;
+    document.getElementById('is_active').checked = user.is_active == 1;
+    
+    document.getElementById('userModalLabel').textContent = 'แก้ไขข้อมูลผู้ใช้';
+    document.getElementById('submitBtn').name = 'edit_user';
+    document.getElementById('submitBtn').textContent = 'อัพเดท';
+    
+    // Make password optional in edit mode
+    document.getElementById('password').required = false;
+    document.getElementById('passwordLabel').textContent = 'รหัสผ่าน';
+    document.getElementById('passwordHelp').style.display = 'block';
+}
 
 $(document).ready(function() {
     $('#dataTable').DataTable({
