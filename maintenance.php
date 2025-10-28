@@ -17,7 +17,7 @@ if (isset($_GET['action'])) {
 
 if ($_POST) {
     if (isset($_POST['add_maintenance'])) {
-        $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_id, building_id, floor_id, room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_name, building_name, floor_name, room_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['equipment_id'],
             $_POST['report_date'],
@@ -28,10 +28,10 @@ if ($_POST) {
             $_POST['status'],
             $_POST['solution_description'],
             $_POST['completed_date'],
-            $_POST['school_id'],
-            $_POST['building_id'],
-            $_POST['floor_id'],
-            $_POST['room_id']
+            $_POST['school_name'],
+            $_POST['building_name'],
+            $_POST['floor_name'],
+            $_POST['room_name']
         ]);
         
         // Update equipment status if changed
@@ -46,7 +46,7 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_maintenance'])) {
-        $stmt = $db->prepare("UPDATE maintenance SET equipment_id=?, report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_id=?, building_id=?, floor_id=?, room_id=? WHERE id=?");
+        $stmt = $db->prepare("UPDATE maintenance SET equipment_id=?, report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=? WHERE id=?");
         $stmt->execute([
             $_POST['equipment_id'],
             $_POST['report_date'],
@@ -57,10 +57,10 @@ if ($_POST) {
             $_POST['status'],
             $_POST['solution_description'],
             $_POST['completed_date'],
-            $_POST['school_id'],
-            $_POST['building_id'],
-            $_POST['floor_id'],
-            $_POST['room_id'],
+            $_POST['school_name'],
+            $_POST['building_name'],
+            $_POST['floor_name'],
+            $_POST['room_name'],
             $_POST['id']
         ]);
         
@@ -77,16 +77,10 @@ if ($_POST) {
 }
 
 // Get maintenance list with location data
-$maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, 
-                             s.name as school_name, b.name as building_name, 
-                             f.name as floor_name, r.name as room_name,
+$maintenance_query = "SELECT m.*, e.code, e.name as equipment_name,
                              c.name as category_name, ci.name as item_name
                       FROM maintenance m 
                       JOIN equipment e ON m.equipment_id = e.id 
-                      LEFT JOIN schools s ON m.school_id = s.id
-                      LEFT JOIN buildings b ON m.building_id = b.id
-                      LEFT JOIN floors f ON m.floor_id = f.id
-                      LEFT JOIN rooms r ON m.room_id = r.id
                       LEFT JOIN categories c ON e.category_id = c.id 
                       LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
                       ORDER BY m.created_at DESC";
@@ -99,12 +93,6 @@ $equipment_list = $db->query("SELECT e.id, e.code, e.name, c.name as category_na
                               LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
                               ORDER BY e.code")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get location data for dropdowns
-$schools = $db->query("SELECT * FROM schools WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
-$buildings = $db->query("SELECT * FROM buildings WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
-$floors = $db->query("SELECT * FROM floors WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
-$rooms = $db->query("SELECT * FROM rooms WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
-
 // Get frequently repaired equipment
 $frequent_repair_query = "
     SELECT e.code, e.name, c.name as category_name, ci.name as item_name, COUNT(m.id) as repair_count 
@@ -116,6 +104,26 @@ $frequent_repair_query = "
     HAVING COUNT(m.id) > 2 
     ORDER BY repair_count DESC";
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
+
+// ข้อมูลโรงเรียนจาก PHP (สำหรับ dropdown เริ่มต้น)
+$schools = [
+    "โรงเรียนวารีเชียงใหม่",
+    "โรงเรียนอนุบาลวารีเชียงใหม่", 
+    "โรงเรียนนานาชาติวารีเชียงใหม่"
+];
+
+// ข้อมูลห้อง (ใช้ร่วมกันทุกชั้น)
+$rooms = [
+    "ห้อง 101", "ห้อง 102", "ห้อง 103", "ห้อง 104", "ห้อง 105",
+    "ห้อง 201", "ห้อง 202", "ห้อง 203", "ห้อง 204", "ห้อง 205", 
+    "ห้อง 301", "ห้อง 302", "ห้อง 303", "ห้อง 304", "ห้อง 305",
+    "ห้อง 401", "ห้อง 402", "ห้อง 403", "ห้อง 404", "ห้อง 405",
+    "ห้อง 501", "ห้อง 502", "ห้อง 503", "ห้อง 504", "ห้อง 505",
+    "ห้อง 601", "ห้อง 602", "ห้อง 603", "ห้อง 604", "ห้อง 605",
+    "ห้อง 701", "ห้อง 702", "ห้อง 703", "ห้อง 704", "ห้อง 705",
+    "ห้องประชุมใหญ่", "ห้องประชุมเล็ก", "ห้องพักครู", "ห้องสำนักงาน",
+    "ห้องปฏิบัติการวิทยาศาสตร์", "ห้องคอมพิวเตอร์", "ห้องดนตรี", "ห้องศิลปะ", "ห้องสมุด"
+];
 ?>
 
 <?php 
@@ -241,29 +249,29 @@ include 'includes/sidebar.php';
                             <h6 class="border-bottom pb-2"><i class="fas fa-map-marker-alt"></i> เลือกสถานที่</h6>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">โรงเรียน</label>
-                            <select class="form-control" name="school_id" id="school_id" required onchange="updateBuildings()">
+                            <label class="form-label">โรงเรียน *</label>
+                            <select class="form-control" name="school_name" id="school_name" required onchange="updateBuildings()">
                                 <option value="">เลือกโรงเรียน</option>
                                 <?php foreach($schools as $school): ?>
-                                <option value="<?php echo $school['id']; ?>"><?php echo $school['name']; ?></option>
+                                <option value="<?php echo $school; ?>"><?php echo $school; ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">ตึก</label>
-                            <select class="form-control" name="building_id" id="building_id" required disabled onchange="updateFloors()">
+                            <label class="form-label">ตึก *</label>
+                            <select class="form-control" name="building_name" id="building_name" required disabled onchange="updateFloors()">
                                 <option value="">เลือกตึก</option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">ชั้น</label>
-                            <select class="form-control" name="floor_id" id="floor_id" required disabled onchange="updateRooms()">
+                            <label class="form-label">ชั้น *</label>
+                            <select class="form-control" name="floor_name" id="floor_name" required disabled onchange="updateRooms()">
                                 <option value="">เลือกชั้น</option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">ห้อง</label>
-                            <select class="form-control" name="room_id" id="room_id" required disabled>
+                            <label class="form-label">ห้อง *</label>
+                            <select class="form-control" name="room_name" id="room_name" required disabled>
                                 <option value="">เลือกห้อง</option>
                             </select>
                         </div>
@@ -349,30 +357,56 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
-// Location data from PHP
-const buildingsData = <?php echo json_encode($buildings); ?>;
-const floorsData = <?php echo json_encode($floors); ?>;
+// ข้อมูลโรงเรียน ตึก และชั้น
+const schoolData = {
+    "โรงเรียนวารีเชียงใหม่": {
+        buildings: [
+            { name: "ตึก1-อำนวยการ", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "ตึก3-ประถม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4"] },
+            { name: "ตึก4-ประถม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3"] },
+            { name: "ตึก4-มัธยม", floors: ["ชั้น 3", "ชั้น 4", "ชั้น 5"] },
+            { name: "ตึก5-อนุบาล", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "ตึก6", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "ตึก7-มัธยม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4", "ชั้น 5", "ชั้น 6", "ชั้น 7"] },
+            { name: "ตึก10", floors: ["ชั้น 1", "ชั้น 2"] }
+        ]
+    },
+    "โรงเรียนอนุบาลวารีเชียงใหม่": {
+        buildings: [
+            { name: "ตึก1-อำนวยการ", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "ตึก6", floors: ["ชั้น 1", "ชั้น 2"] }
+        ]
+    },
+    "โรงเรียนนานาชาติวารีเชียงใหม่": {
+        buildings: [
+            { name: "ตึก8", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4"] },
+            { name: "ตึก9", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3"] },
+            { name: "ตึก10", floors: ["ชั้น 1", "ชั้น 2"] }
+        ]
+    }
+};
+
+// ข้อมูลห้อง (จาก PHP)
 const roomsData = <?php echo json_encode($rooms); ?>;
 
 function updateBuildings() {
-    const schoolId = document.getElementById('school_id').value;
-    const buildingSelect = document.getElementById('building_id');
-    const floorSelect = document.getElementById('floor_id');
-    const roomSelect = document.getElementById('room_id');
+    const schoolName = document.getElementById('school_name').value;
+    const buildingSelect = document.getElementById('building_name');
+    const floorSelect = document.getElementById('floor_name');
+    const roomSelect = document.getElementById('room_name');
     
     // Reset dependent dropdowns
     buildingSelect.innerHTML = '<option value="">เลือกตึก</option>';
     floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
     roomSelect.innerHTML = '<option value="">เลือกห้อง</option>';
     
-    if (schoolId) {
+    if (schoolName && schoolData[schoolName]) {
         buildingSelect.disabled = false;
         
-        // Filter buildings by school_id
-        const filteredBuildings = buildingsData.filter(building => building.school_id == schoolId);
-        filteredBuildings.forEach(building => {
+        // Add buildings for selected school
+        schoolData[schoolName].buildings.forEach(building => {
             const option = document.createElement('option');
-            option.value = building.id;
+            option.value = building.name;
             option.textContent = building.name;
             buildingSelect.appendChild(option);
         });
@@ -384,25 +418,28 @@ function updateBuildings() {
 }
 
 function updateFloors() {
-    const buildingId = document.getElementById('building_id').value;
-    const floorSelect = document.getElementById('floor_id');
-    const roomSelect = document.getElementById('room_id');
+    const schoolName = document.getElementById('school_name').value;
+    const buildingName = document.getElementById('building_name').value;
+    const floorSelect = document.getElementById('floor_name');
+    const roomSelect = document.getElementById('room_name');
     
     // Reset dependent dropdowns
     floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
     roomSelect.innerHTML = '<option value="">เลือกห้อง</option>';
     
-    if (buildingId) {
+    if (schoolName && buildingName && schoolData[schoolName]) {
         floorSelect.disabled = false;
         
-        // Filter floors by building_id
-        const filteredFloors = floorsData.filter(floor => floor.building_id == buildingId);
-        filteredFloors.forEach(floor => {
-            const option = document.createElement('option');
-            option.value = floor.id;
-            option.textContent = floor.name;
-            floorSelect.appendChild(option);
-        });
+        // Find the selected building and get its floors
+        const selectedBuilding = schoolData[schoolName].buildings.find(b => b.name === buildingName);
+        if (selectedBuilding) {
+            selectedBuilding.floors.forEach(floor => {
+                const option = document.createElement('option');
+                option.value = floor;
+                option.textContent = floor;
+                floorSelect.appendChild(option);
+            });
+        }
     } else {
         floorSelect.disabled = true;
         roomSelect.disabled = true;
@@ -410,25 +447,18 @@ function updateFloors() {
 }
 
 function updateRooms() {
-    const floorId = document.getElementById('floor_id').value;
-    const roomSelect = document.getElementById('room_id');
+    const roomSelect = document.getElementById('room_name');
     
     roomSelect.innerHTML = '<option value="">เลือกห้อง</option>';
+    roomSelect.disabled = false;
     
-    if (floorId) {
-        roomSelect.disabled = false;
-        
-        // Filter rooms by floor_id
-        const filteredRooms = roomsData.filter(room => room.floor_id == floorId);
-        filteredRooms.forEach(room => {
-            const option = document.createElement('option');
-            option.value = room.id;
-            option.textContent = room.name;
-            roomSelect.appendChild(option);
-        });
-    } else {
-        roomSelect.disabled = true;
-    }
+    // Add all rooms (since rooms are shared across all floors)
+    roomsData.forEach(room => {
+        const option = document.createElement('option');
+        option.value = room;
+        option.textContent = room;
+        roomSelect.appendChild(option);
+    });
 }
 
 function clearForm() {
@@ -442,12 +472,12 @@ function clearForm() {
     document.getElementById('equipment_id').disabled = false;
     
     // Reset location dropdowns
-    document.getElementById('building_id').innerHTML = '<option value="">เลือกตึก</option>';
-    document.getElementById('floor_id').innerHTML = '<option value="">เลือกชั้น</option>';
-    document.getElementById('room_id').innerHTML = '<option value="">เลือกห้อง</option>';
-    document.getElementById('building_id').disabled = true;
-    document.getElementById('floor_id').disabled = true;
-    document.getElementById('room_id').disabled = true;
+    document.getElementById('building_name').innerHTML = '<option value="">เลือกตึก</option>';
+    document.getElementById('floor_name').innerHTML = '<option value="">เลือกชั้น</option>';
+    document.getElementById('room_name').innerHTML = '<option value="">เลือกห้อง</option>';
+    document.getElementById('building_name').disabled = true;
+    document.getElementById('floor_name').disabled = true;
+    document.getElementById('room_name').disabled = true;
 }
 
 function editMaintenance(maintenance) {
@@ -463,20 +493,20 @@ function editMaintenance(maintenance) {
     document.getElementById('completed_date').value = maintenance.completed_date || '';
     
     // Set location values
-    if (maintenance.school_id) {
-        document.getElementById('school_id').value = maintenance.school_id;
+    if (maintenance.school_name) {
+        document.getElementById('school_name').value = maintenance.school_name;
         updateBuildings();
         setTimeout(() => {
-            if (maintenance.building_id) {
-                document.getElementById('building_id').value = maintenance.building_id;
+            if (maintenance.building_name) {
+                document.getElementById('building_name').value = maintenance.building_name;
                 updateFloors();
                 setTimeout(() => {
-                    if (maintenance.floor_id) {
-                        document.getElementById('floor_id').value = maintenance.floor_id;
+                    if (maintenance.floor_name) {
+                        document.getElementById('floor_name').value = maintenance.floor_name;
                         updateRooms();
                         setTimeout(() => {
-                            if (maintenance.room_id) {
-                                document.getElementById('room_id').value = maintenance.room_id;
+                            if (maintenance.room_name) {
+                                document.getElementById('room_name').value = maintenance.room_name;
                             }
                         }, 100);
                     }
@@ -493,23 +523,6 @@ function editMaintenance(maintenance) {
     document.getElementById('equipment_id').disabled = true;
 }
 
-// Real-time table update simulation
-function refreshTable() {
-    // In a real application, you would use AJAX to refresh the table data
-    // For demonstration, we'll just reload the page after a short delay
-    setTimeout(() => {
-        window.location.reload();
-    }, 1000);
-}
-
-// Auto-refresh table every 30 seconds
-setInterval(() => {
-    // Check if modal is not open before refreshing
-    if (!document.getElementById('maintenanceModal').classList.contains('show')) {
-        refreshTable();
-    }
-}, 30000);
-
 $(document).ready(function() {
     $('#dataTable').DataTable({
         language: {
@@ -518,25 +531,6 @@ $(document).ready(function() {
         order: [[3, 'desc']], // Sort by report date descending
         pageLength: 25,
         responsive: true
-    });
-
-    // Auto-submit form handler for real-time updates
-    $('#maintenanceForm').on('submit', function(e) {
-        e.preventDefault();
-        
-        // Submit form via AJAX for real-time update
-        $.ajax({
-            url: 'maintenance.php',
-            type: 'POST',
-            data: $(this).serialize(),
-            success: function(response) {
-                $('#maintenanceModal').modal('hide');
-                refreshTable();
-            },
-            error: function() {
-                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-            }
-        });
     });
 });
 </script>
