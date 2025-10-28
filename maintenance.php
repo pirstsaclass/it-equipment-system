@@ -35,22 +35,9 @@ if ($_POST) {
                 $_POST['room_name']
             ]);
             
-            // Update equipment status if changed to completed
-            if ($_POST['status'] == 'ซ่อมเสร็จ') {
-                $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
-                $update_stmt->execute([$_POST['equipment_id']]);
-            }
-
-            // ตรวจสอบว่า equipment_id มีอยู่ในตาราง equipment จริงหรือไม่
-            $check_equipment = $db->prepare("SELECT id FROM equipment WHERE id = ?");
-            $check_equipment->execute([$equipment_id]);
-            $equipment_exists = $check_equipment->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$equipment_exists) {
-                $_SESSION['error'] = "รหัสครุภัณฑ์ไม่ถูกต้อง หรือไม่มีอยู่ในระบบ";
-                header("Location: maintenance.php");
-                exit();
-            }
+            // อัพเดทสถานะ equipment เป็น 'รอซ่อม'
+            $update_stmt = $db->prepare("UPDATE equipment SET status = 'รอซ่อม' WHERE id = ?");
+            $update_stmt->execute([$_POST['equipment_id']]);
             
             $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมเรียบร้อยแล้ว";
             header("Location: maintenance.php");
@@ -83,21 +70,31 @@ if ($_POST) {
                 $_POST['id']
             ]);
             
-            // Update equipment status if changed to completed
-            if ($_POST['status'] == 'ซ่อมเสร็จ') {
-                $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
-                $update_stmt->execute([$_POST['equipment_id']]);
+            // อัพเดทสถานะ equipment ตามสถานะ maintenance
+            $equipment_id = $_POST['equipment_id'];
+            $maintenance_status = $_POST['status'];
+            $equipment_status = '';
+            
+            switch($maintenance_status) {
+                case 'รอซ่อม':
+                    $equipment_status = 'รอซ่อม';
+                    break;
+                case 'กำลังดำเนินการ':
+                    $equipment_status = 'กำลังซ่อม';
+                    break;
+                case 'ซ่อมเสร็จ':
+                    $equipment_status = 'ซ่อมเสร็จแล้ว';
+                    break;
+                case 'ยกเลิก':
+                    $equipment_status = 'ใช้งานปกติ';
+                    break;
             }
-            // Update equipment status
-                $equipment_id = $_POST['equipment_id'];
-                $new_status = 'รอซ่อม'; // หรือสถานะตามที่กำหนด
-                
+            
+            if ($equipment_status) {
                 $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
-                $update_stmt->execute([$new_status, $equipment_id]);
-                
-                $_SESSION['success'] = "บันทึกข้อมูลการบำรุงรักษาและอัพเดทสถานะครุภัณฑ์เรียบร้อยแล้ว";
-
-
+                $update_stmt->execute([$equipment_status, $equipment_id]);
+            }
+            
             $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมเรียบร้อยแล้ว";
             header("Location: maintenance.php");
             exit();
@@ -108,7 +105,8 @@ if ($_POST) {
             exit();
         }
     }
-    // When updating maintenance status
+    
+    // ส่วนสำหรับอัพเดทสถานะอย่างเดียว
     if (isset($_POST['update_maintenance_status'])) {
         $maintenance_id = $_POST['maintenance_id'];
         $new_status = $_POST['status'];
@@ -121,14 +119,14 @@ if ($_POST) {
         // Update equipment status based on maintenance status
         $equipment_status = '';
         switch ($new_status) {
-            case 'กำลังซ่อม':
+            case 'รอซ่อม':
+                $equipment_status = 'รอซ่อม';
+                break;
+            case 'กำลังดำเนินการ':
                 $equipment_status = 'กำลังซ่อม';
                 break;
-            case 'ซ่อมเสร็จแล้ว':
+            case 'ซ่อมเสร็จ':
                 $equipment_status = 'ซ่อมเสร็จแล้ว';
-                break;
-            case 'ส่งคืนแล้ว':
-                $equipment_status = 'ส่งคืนแล้ว';
                 break;
             case 'ยกเลิก':
                 $equipment_status = 'ใช้งานปกติ';
@@ -141,8 +139,9 @@ if ($_POST) {
         }
         
         $_SESSION['success'] = "อัพเดทสถานะการบำรุงรักษาและสถานะครุภัณฑ์เรียบร้อยแล้ว";
+        header("Location: maintenance.php");
+        exit();
     }
-
 }
 
 // Get maintenance list with location data
@@ -230,7 +229,11 @@ include 'includes/sidebar.php';
         <h6><i class="fas fa-exclamation-triangle"></i> อุปกรณ์ที่ซ่อมบ่อย</h6>
         <ul class="mb-0">
             <?php foreach($frequent_repairs as $freq): ?>
-            <li><?php echo $freq['code'] . ' - ' . $freq['name'] . ' (ซ่อมแล้ว ' . $freq['repair_count'] . ' ครั้ง)'; ?></li>
+            <li>
+                <a href="equipment_detail.php?id=<?php echo $freq['id'] ?? ''; ?>" class="text-decoration-none">
+                    <?php echo $freq['code'] . ' - ' . $freq['name'] . ' (ซ่อมแล้ว ' . $freq['repair_count'] . ' ครั้ง)'; ?>
+                </a>
+            </li>
             <?php endforeach; ?>
         </ul>
     </div>
@@ -389,14 +392,11 @@ include 'includes/sidebar.php';
                         </div>
                         <div class="col-12 mb-3">
                             <label class="form-label">เลือกครุภัณฑ์ *</label>
-                           <select class="form-control" name="equipment_id" id="equipment_id" required>
+                            <select class="form-control" name="equipment_id" id="equipment_id" required>
                                 <option value="">เลือกครุภัณฑ์</option>
-                                <?php 
-                                $equipment_list = $db->query("SELECT id, code, name FROM equipment ORDER BY code")->fetchAll(PDO::FETCH_ASSOC);
-                                foreach($equipment_list as $equip): 
-                                ?>
-                                <option value="<?php echo $equip['id']; ?>">
-                                    <?php echo $equip['code']; ?> - <?php echo $equip['name']; ?>
+                                <?php foreach($equipment_list as $equipment): ?>
+                                <option value="<?php echo $equipment['id']; ?>">
+                                    <?php echo $equipment['code'] . ' - ' . $equipment['name'] . ' (' . $equipment['category_name'] . ')'; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>

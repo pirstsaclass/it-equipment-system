@@ -27,6 +27,32 @@ if (isset($_GET['action'])) {
     }
 }
 
+// Function to update maintenance status from equipment
+function updateMaintenanceStatusFromEquipment($db, $equipment_id, $equipment_status) {
+    $maintenance_status = '';
+    
+    // Map equipment status to maintenance status
+    switch($equipment_status) {
+        case 'รอซ่อม':
+            $maintenance_status = 'รอซ่อม';
+            break;
+        case 'กำลังซ่อม':
+            $maintenance_status = 'กำลังดำเนินการ';
+            break;
+        case 'ซ่อมเสร็จแล้ว':
+            $maintenance_status = 'ซ่อมเสร็จ';
+            break;
+        case 'ใช้งานปกติ':
+            $maintenance_status = 'ซ่อมเสร็จ';
+            break;
+    }
+    
+    if ($maintenance_status) {
+        $stmt = $db->prepare("UPDATE maintenance SET status = ? WHERE equipment_id = ? AND status != 'ยกเลิก'");
+        $stmt->execute([$maintenance_status, $equipment_id]);
+    }
+}
+
 if ($_POST) {
     if (isset($_POST['add_equipment'])) {
         // Handle image upload
@@ -85,6 +111,12 @@ if ($_POST) {
                 $_POST['specifications'],
                 $image_filename
             ]);
+            
+            $equipment_id = $db->lastInsertId();
+            
+            // อัพเดทสถานะใน maintenance ถ้ามีการซ่อมบำรุงที่เกี่ยวข้อง
+            updateMaintenanceStatusFromEquipment($db, $equipment_id, $_POST['status']);
+            
             $_SESSION['success'] = "เพิ่มข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
             header("Location: equipment.php");
             exit();
@@ -158,6 +190,10 @@ if ($_POST) {
                 $image_filename,
                 $_POST['id']
             ]);
+            
+            // อัพเดทสถานะใน maintenance
+            updateMaintenanceStatusFromEquipment($db, $_POST['id'], $_POST['status']);
+            
             $_SESSION['success'] = "แก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
             header("Location: equipment.php");
             exit();
@@ -422,7 +458,11 @@ include 'includes/sidebar.php';
                         <?php if (count($equipment_list) > 0): ?>
                             <?php foreach($equipment_list as $equipment): ?>
                             <tr>
-                                <td class="fw-bold text-primary"><?php echo $equipment['code']; ?></td>
+                                <td class="fw-bold text-primary">
+                                    <a href="equipment_detail.php?id=<?php echo $equipment['id']; ?>" class="text-decoration-none" title="ดูรายละเอียดครุภัณฑ์">
+                                        <?php echo $equipment['code']; ?>
+                                    </a>
+                                </td>
                                 <td><?php echo $equipment['name']; ?></td>
                                 <td>
                                     <span class="badge bg-secondary"><?php echo $equipment['category_name']; ?></span>
@@ -431,16 +471,16 @@ include 'includes/sidebar.php';
                                 <td><?php echo $equipment['department_name']; ?></td>
                                 <td>
                                     <?php 
-                                  $status_badge = [
-                                            'ใหม่' => 'success',
-                                            'ใช้งานปกติ' => 'primary',
-                                            'ชำรุด' => 'warning',
-                                            'รอซ่อม' => 'info',
-                                            'กำลังซ่อม' => 'warning',
-                                            'ซ่อมเสร็จแล้ว' => 'success',
-                                            'ส่งคืนแล้ว' => 'primary',
-                                            'จำหน่ายแล้ว' => 'danger'
-                                        ];
+                                    $status_badge = [
+                                        'ใหม่' => 'success',
+                                        'ใช้งานปกติ' => 'primary',
+                                        'ชำรุด' => 'warning',
+                                        'รอซ่อม' => 'info',
+                                        'กำลังซ่อม' => 'warning',
+                                        'ซ่อมเสร็จแล้ว' => 'success',
+                                        'ส่งคืนแล้ว' => 'primary',
+                                        'จำหน่ายแล้ว' => 'danger'
+                                    ];
                                     ?>
 
                                     <span class="badge bg-<?php echo $status_badge[$equipment['status']] ?? 'secondary'; ?>">
