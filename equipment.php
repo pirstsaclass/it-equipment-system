@@ -317,10 +317,13 @@ include 'includes/sidebar.php';
                             <option value="ใช้งานปกติ" <?php echo ($filter_status == 'ใช้งานปกติ') ? 'selected' : ''; ?>>ใช้งานปกติ</option>
                             <option value="ชำรุด" <?php echo ($filter_status == 'ชำรุด') ? 'selected' : ''; ?>>ชำรุด</option>
                             <option value="รอซ่อม" <?php echo ($filter_status == 'รอซ่อม') ? 'selected' : ''; ?>>รอซ่อม</option>
+                            <option value="กำลังซ่อม" <?php echo ($filter_status == 'กำลังซ่อม') ? 'selected' : ''; ?>>กำลังซ่อม</option>
+                            <option value="ซ่อมเสร็จแล้ว" <?php echo ($filter_status == 'ซ่อมเสร็จแล้ว') ? 'selected' : ''; ?>>ซ่อมเสร็จแล้ว</option>
+                            <option value="ส่งคืนแล้ว" <?php echo ($filter_status == 'ส่งคืนแล้ว') ? 'selected' : ''; ?>>ส่งคืนแล้ว</option>
                             <option value="จำหน่ายแล้ว" <?php echo ($filter_status == 'จำหน่ายแล้ว') ? 'selected' : ''; ?>>จำหน่ายแล้ว</option>
                         </select>
                     </div>
-                    
+                                        
                     <!-- Dropdown เลือกจำนวนรายการต่อหน้า -->
                     <div class="col-md-2">
                         <label class="form-label fw-bold">แสดงต่อหน้า</label>
@@ -428,14 +431,18 @@ include 'includes/sidebar.php';
                                 <td><?php echo $equipment['department_name']; ?></td>
                                 <td>
                                     <?php 
-                                    $status_badge = [
-                                        'ใหม่' => 'success',
-                                        'ใช้งานปกติ' => 'primary',
-                                        'ชำรุด' => 'warning',
-                                        'รอซ่อม' => 'info',
-                                        'จำหน่ายแล้ว' => 'danger'
-                                    ];
+                                  $status_badge = [
+                                            'ใหม่' => 'success',
+                                            'ใช้งานปกติ' => 'primary',
+                                            'ชำรุด' => 'warning',
+                                            'รอซ่อม' => 'info',
+                                            'กำลังซ่อม' => 'warning',
+                                            'ซ่อมเสร็จแล้ว' => 'success',
+                                            'ส่งคืนแล้ว' => 'primary',
+                                            'จำหน่ายแล้ว' => 'danger'
+                                        ];
                                     ?>
+
                                     <span class="badge bg-<?php echo $status_badge[$equipment['status']] ?? 'secondary'; ?>">
                                         <?php echo $equipment['status']; ?>
                                     </span>
@@ -656,16 +663,19 @@ include 'includes/sidebar.php';
                             
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">สถานะ</label>
-                                    <select class="form-control" name="status" id="status">
-                                        <option value="ใหม่">ใหม่</option>
-                                        <option value="ใช้งานปกติ" selected>ใช้งานปกติ</option>
-                                        <option value="ชำรุด">ชำรุด</option>
-                                        <option value="รอซ่อม">รอซ่อม</option>
-                                        <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
-                                    </select>
-                                </div>
+                                <label class="form-label">สถานะ</label>
+                                <select class="form-control" name="status" id="status">
+                                    <option value="ใหม่">ใหม่</option>
+                                    <option value="ใช้งานปกติ" selected>ใช้งานปกติ</option>
+                                    <option value="ชำรุด">ชำรุด</option>
+                                    <option value="รอซ่อม">รอซ่อม</option>
+                                    <option value="กำลังซ่อม">กำลังซ่อม</option>
+                                    <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
+                                    <option value="ส่งคืนแล้ว">ส่งคืนแล้ว</option>
+                                    <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
+                                </select>
                             </div>
+                            </div>                            
                             
                             <div class="mb-3">
                                 <label class="form-label">รายละเอียดคุณสมบัติ</label>
@@ -857,13 +867,16 @@ function viewEquipment(equipment) {
     document.getElementById('viewSpecifications').textContent = equipment.specifications || '-';
     
     // Status badge
-    const statusBadges = {
-        'ใหม่': 'success',
-        'ใช้งานปกติ': 'primary',
-        'ชำรุด': 'warning',
-        'รอซ่อม': 'info',
-        'จำหน่ายแล้ว': 'danger'
-    };
+const statusBadges = {
+    'ใหม่': 'success',
+    'ใช้งานปกติ': 'primary',
+    'ชำรุด': 'warning',
+    'รอซ่อม': 'info',
+    'กำลังซ่อม': 'warning',
+    'ซ่อมเสร็จแล้ว': 'success',
+    'ส่งคืนแล้ว': 'primary',
+    'จำหน่ายแล้ว': 'danger'
+};
     const badgeClass = statusBadges[equipment.status] || 'secondary';
     document.getElementById('viewStatus').innerHTML = `<span class="badge bg-${badgeClass}">${equipment.status}</span>`;
     

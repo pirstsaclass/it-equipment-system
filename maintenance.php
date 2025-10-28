@@ -97,6 +97,41 @@ if ($_POST) {
             exit();
         }
     }
+    // When updating maintenance status
+    if (isset($_POST['update_maintenance_status'])) {
+        $maintenance_id = $_POST['maintenance_id'];
+        $new_status = $_POST['status'];
+        $equipment_id = $_POST['equipment_id'];
+        
+        // Update maintenance status
+        $stmt = $db->prepare("UPDATE maintenance SET status = ? WHERE id = ?");
+        $stmt->execute([$new_status, $maintenance_id]);
+        
+        // Update equipment status based on maintenance status
+        $equipment_status = '';
+        switch ($new_status) {
+            case 'กำลังซ่อม':
+                $equipment_status = 'กำลังซ่อม';
+                break;
+            case 'ซ่อมเสร็จแล้ว':
+                $equipment_status = 'ซ่อมเสร็จแล้ว';
+                break;
+            case 'ส่งคืนแล้ว':
+                $equipment_status = 'ส่งคืนแล้ว';
+                break;
+            case 'ยกเลิก':
+                $equipment_status = 'ใช้งานปกติ';
+                break;
+        }
+        
+        if ($equipment_status) {
+            $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
+            $update_stmt->execute([$equipment_status, $equipment_id]);
+        }
+        
+        $_SESSION['success'] = "อัพเดทสถานะการบำรุงรักษาและสถานะครุภัณฑ์เรียบร้อยแล้ว";
+    }
+
 }
 
 // Get maintenance list with location data
