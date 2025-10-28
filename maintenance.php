@@ -40,6 +40,17 @@ if ($_POST) {
                 $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
                 $update_stmt->execute([$_POST['equipment_id']]);
             }
+
+            // ตรวจสอบว่า equipment_id มีอยู่ในตาราง equipment จริงหรือไม่
+            $check_equipment = $db->prepare("SELECT id FROM equipment WHERE id = ?");
+            $check_equipment->execute([$equipment_id]);
+            $equipment_exists = $check_equipment->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$equipment_exists) {
+                $_SESSION['error'] = "รหัสครุภัณฑ์ไม่ถูกต้อง หรือไม่มีอยู่ในระบบ";
+                header("Location: maintenance.php");
+                exit();
+            }
             
             $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมเรียบร้อยแล้ว";
             header("Location: maintenance.php");
@@ -378,11 +389,14 @@ include 'includes/sidebar.php';
                         </div>
                         <div class="col-12 mb-3">
                             <label class="form-label">เลือกครุภัณฑ์ *</label>
-                            <select class="form-control" name="equipment_id" id="equipment_id" required>
+                           <select class="form-control" name="equipment_id" id="equipment_id" required>
                                 <option value="">เลือกครุภัณฑ์</option>
-                                <?php foreach($equipment_list as $equipment): ?>
-                                <option value="<?php echo $equipment['id']; ?>">
-                                    <?php echo $equipment['code'] . ' - ' . $equipment['name'] . ' (' . $equipment['category_name'] . ')'; ?>
+                                <?php 
+                                $equipment_list = $db->query("SELECT id, code, name FROM equipment ORDER BY code")->fetchAll(PDO::FETCH_ASSOC);
+                                foreach($equipment_list as $equip): 
+                                ?>
+                                <option value="<?php echo $equip['id']; ?>">
+                                    <?php echo $equip['code']; ?> - <?php echo $equip['name']; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
