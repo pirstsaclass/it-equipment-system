@@ -17,76 +17,62 @@ if (isset($_GET['action'])) {
 
 if ($_POST) {
     if (isset($_POST['add_maintenance'])) {
-        try {
-            $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_name, building_name, floor_name, room_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->execute([
-                $_POST['equipment_id'],
-                $_POST['report_date'],
-                $_POST['problem_description'],
-                $_POST['reported_by'],
-                $_POST['assigned_technician'],
-                $_POST['cost'],
-                $_POST['status'],
-                $_POST['solution_description'],
-                $_POST['completed_date'],
-                $_POST['school_name'],
-                $_POST['building_name'],
-                $_POST['floor_name'],
-                $_POST['room_name']
-            ]);
-            
-            // Update equipment status if changed to completed
-            if ($_POST['status'] == 'ซ่อมเสร็จ') {
-                $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
-                $update_stmt->execute([$_POST['equipment_id']]);
-            }
-            
-            $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมเรียบร้อยแล้ว";
-            header("Location: maintenance.php");
-            exit();
-            
-        } catch (PDOException $e) {
-            $_SESSION['error'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล: " . $e->getMessage();
-            header("Location: maintenance.php");
-            exit();
+        $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_name, building_name, floor_name, room_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $_POST['equipment_id'],
+            $_POST['report_date'],
+            $_POST['problem_description'],
+            $_POST['reported_by'],
+            $_POST['assigned_technician'],
+            $_POST['cost'],
+            $_POST['status'],
+            $_POST['solution_description'],
+            $_POST['completed_date'],
+            $_POST['school_name'],
+            $_POST['building_name'],
+            $_POST['floor_name'],
+            $_POST['room_name']
+        ]);
+        
+        // Update equipment status if changed
+        if ($_POST['status'] == 'ซ่อมเสร็จ') {
+            $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
+            $update_stmt->execute([$_POST['equipment_id']]);
         }
+        
+        $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมเรียบร้อยแล้ว";
+        header("Location: maintenance.php");
+        exit();
     }
     
     if (isset($_POST['edit_maintenance'])) {
-        try {
-            $stmt = $db->prepare("UPDATE maintenance SET equipment_id=?, report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=?, updated_at=NOW() WHERE id=?");
-            $stmt->execute([
-                $_POST['equipment_id'],
-                $_POST['report_date'],
-                $_POST['problem_description'],
-                $_POST['reported_by'],
-                $_POST['assigned_technician'],
-                $_POST['cost'],
-                $_POST['status'],
-                $_POST['solution_description'],
-                $_POST['completed_date'],
-                $_POST['school_name'],
-                $_POST['building_name'],
-                $_POST['floor_name'],
-                $_POST['room_name'],
-                $_POST['id']
-            ]);
-            
-            // Update equipment status if changed to completed
-            if ($_POST['status'] == 'ซ่อมเสร็จ') {
-                $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
-                $update_stmt->execute([$_POST['equipment_id']]);
-            }
-            
-            $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมเรียบร้อยแล้ว";
-            header("Location: maintenance.php");
-            exit();
-            
-        } catch (PDOException $e) {
-            $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัปเดตข้อมูล: " . $e->getMessage();
-            header("Location: maintenance.php");
-            exit();
+        $stmt = $db->prepare("UPDATE maintenance SET equipment_id=?, report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=? WHERE id=?");
+        $stmt->execute([
+            $_POST['equipment_id'],
+            $_POST['report_date'],
+            $_POST['problem_description'],
+            $_POST['reported_by'],
+            $_POST['assigned_technician'],
+            $_POST['cost'],
+            $_POST['status'],
+            $_POST['solution_description'],
+            $_POST['completed_date'],
+            $_POST['school_name'],
+            $_POST['building_name'],
+            $_POST['floor_name'],
+            $_POST['room_name'],
+            $_POST['id']
+        ]);
+        
+        // Update equipment status if changed
+        if ($_POST['status'] == 'ซ่อมเสร็จ') {
+            $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
+            $update_stmt->execute([$_POST['equipment_id']]);
         }
+        
+        $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมเรียบร้อยแล้ว";
+        header("Location: maintenance.php");
+        exit();
     }
 }
 
@@ -162,13 +148,6 @@ include 'includes/sidebar.php';
         </div>
     <?php endif; ?>
 
-    <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
     <!-- Frequently Repaired Equipment -->
     <?php if (count($frequent_repairs) > 0): ?>
     <div class="alert alert-warning">
@@ -190,28 +169,22 @@ include 'includes/sidebar.php';
                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th width="60">ID</th>
-                            <th width="120">Equipment ID</th>
+                            <th>รหัสครุภัณฑ์</th>
+                            <th>ชื่ออุปกรณ์</th>
                             <th>สถานที่</th>
-                            <th>ปัญหาที่พบ</th>
-                            <th width="120">ผู้แจ้งซ่อม</th>
-                            <th width="120">ผู้ดำเนินการ</th>
-                            <th width="110">วันที่แจ้งซ่อม</th>
-                            <th width="110">วันที่ซ่อมเสร็จ</th>
-                            <th width="100">สถานะ</th>
-                            <th width="90">จัดการ</th>
+                            <th>วันที่แจ้งซ่อม</th>
+                            <th>ผู้แจ้งซ่อม</th>
+                            <th>ผู้ดำเนินการ</th>
+                            <th>ค่าใช้จ่าย</th>
+                            <th>สถานะ</th>
+                            <th>จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach($maintenance_list as $maintenance): ?>
                         <tr>
-                            <td class="text-center">
-                                <strong><?php echo $maintenance['id']; ?></strong>
-                            </td>
-                            <td>
-                                <small class="text-muted"><?php echo $maintenance['code']; ?></small><br>
-                                <strong><?php echo $maintenance['equipment_name']; ?></strong>
-                            </td>
+                            <td><?php echo $maintenance['code']; ?></td>
+                            <td><?php echo $maintenance['equipment_name']; ?></td>
                             <td>
                                 <small class="text-muted">
                                     <?php 
@@ -224,31 +197,11 @@ include 'includes/sidebar.php';
                                     ?>
                                 </small>
                             </td>
-                            <td>
-                                <div style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
-                                     title="<?php echo htmlspecialchars($maintenance['problem_description']); ?>">
-                                    <?php echo mb_substr($maintenance['problem_description'], 0, 50) . (mb_strlen($maintenance['problem_description']) > 50 ? '...' : ''); ?>
-                                </div>
-                            </td>
+                            <td><?php echo $maintenance['report_date']; ?></td>
                             <td><?php echo $maintenance['reported_by']; ?></td>
+                            <td><?php echo $maintenance['assigned_technician']; ?></td>
+                            <td><?php echo number_format($maintenance['cost'], 2); ?> บาท</td>
                             <td>
-                                <?php if ($maintenance['assigned_technician']): ?>
-                                    <span class="badge bg-info"><?php echo $maintenance['assigned_technician']; ?></span>
-                                <?php else: ?>
-                                    <span class="text-muted">-</span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center">
-                                <small><?php echo date('d/m/Y', strtotime($maintenance['report_date'])); ?></small>
-                            </td>
-                            <td class="text-center">
-                                <?php if ($maintenance['completed_date']): ?>
-                                    <small class="text-success"><?php echo date('d/m/Y', strtotime($maintenance['completed_date'])); ?></small>
-                                <?php else: ?>
-                                    <span class="text-muted">-</span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center">
                                 <?php 
                                 $status_badge = [
                                     'รอซ่อม' => 'warning',
@@ -256,21 +209,18 @@ include 'includes/sidebar.php';
                                     'ซ่อมเสร็จ' => 'success',
                                     'ยกเลิก' => 'danger'
                                 ];
-                                $status_class = $status_badge[$maintenance['status']] ?? 'secondary';
                                 ?>
-                                <span class="badge bg-<?php echo $status_class; ?>">
+                                <span class="badge bg-<?php echo $status_badge[$maintenance['status']]; ?>">
                                     <?php echo $maintenance['status']; ?>
                                 </span>
                             </td>
-                            <td class="text-center">
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#maintenanceModal" onclick='editMaintenance(<?php echo json_encode($maintenance); ?>)' title="แก้ไข">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <a href="maintenance.php?action=delete&id=<?php echo $maintenance['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')" title="ลบ">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </div>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#maintenanceModal" onclick='editMaintenance(<?php echo json_encode($maintenance); ?>)'>
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <a href="maintenance.php?action=delete&id=<?php echo $maintenance['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -337,7 +287,7 @@ include 'includes/sidebar.php';
                             <select class="form-control" name="equipment_id" id="equipment_id" required>
                                 <option value="">เลือกครุภัณฑ์</option>
                                 <?php foreach($equipment_list as $equipment): ?>
-                                <option value="<?php echo $equipment['id']; ?>">
+                                <option value="<?php echo $equipment['id']; ?>" data-category="<?php echo $equipment['category_name']; ?>" data-item="<?php echo $equipment['item_name']; ?>">
                                     <?php echo $equipment['code'] . ' - ' . $equipment['name'] . ' (' . $equipment['category_name'] . ')'; ?>
                                 </option>
                                 <?php endforeach; ?>
@@ -355,8 +305,8 @@ include 'includes/sidebar.php';
                             <input type="date" class="form-control" name="report_date" id="report_date" value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">สถานะ *</label>
-                            <select class="form-control" name="status" id="status" required>
+                            <label class="form-label">สถานะ</label>
+                            <select class="form-control" name="status" id="status">
                                 <option value="รอซ่อม">รอซ่อม</option>
                                 <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
                                 <option value="ซ่อมเสร็จ">ซ่อมเสร็จ</option>
@@ -578,12 +528,9 @@ $(document).ready(function() {
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
         },
-        order: [[6, 'desc']], // Sort by report date descending
+        order: [[3, 'desc']], // Sort by report date descending
         pageLength: 25,
-        responsive: true,
-        columnDefs: [
-            { orderable: false, targets: [9] } // Disable sorting for action column
-        ]
+        responsive: true
     });
 });
 </script>
