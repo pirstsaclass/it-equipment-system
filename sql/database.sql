@@ -61,6 +61,30 @@ CREATE TABLE maintenance (
     FOREIGN KEY (equipment_id) REFERENCES equipment(id)
 );
 
+--NEW data ตารางการซ่อมบำรุง
+
+CREATE TABLE maintenance (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    equipment_id INT NOT NULL,
+    report_date DATE NOT NULL,
+    problem_description TEXT NOT NULL,
+    reported_by VARCHAR(255) NOT NULL,
+    assigned_technician VARCHAR(255),
+    cost DECIMAL(10,2) DEFAULT 0,
+    status ENUM('รอซ่อม', 'กำลังดำเนินการ', 'ซ่อมเสร็จ', 'ยกเลิก') DEFAULT 'รอซ่อม',
+    solution_description TEXT,
+    completed_date DATE,
+    school_name VARCHAR(255),
+    building_name VARCHAR(255),
+    floor_name VARCHAR(255),
+    room_name VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id)
+);
+
+
+
 -- ตารางพนักงาน
 CREATE TABLE employees (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -144,6 +168,8 @@ INSERT INTO equipment (code, name, category_id, brand, model, serial_number, pur
 
 INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, status, cost) VALUES
 (3, '2023-10-01', 'เครื่องพิมพ์ไม่ทำงาน กระดาษติด', 'ธีรภัทร สุขใจ', 'สมชาย ใจดี', 'รอซ่อม', 1500.00);
+
+
 
 
 
