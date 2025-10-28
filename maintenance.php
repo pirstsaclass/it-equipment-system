@@ -77,7 +77,16 @@ if ($_POST) {
                 $update_stmt = $db->prepare("UPDATE equipment SET status = 'ใช้งานปกติ' WHERE id = ?");
                 $update_stmt->execute([$_POST['equipment_id']]);
             }
-            
+            // Update equipment status
+                $equipment_id = $_POST['equipment_id'];
+                $new_status = 'รอซ่อม'; // หรือสถานะตามที่กำหนด
+                
+                $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
+                $update_stmt->execute([$new_status, $equipment_id]);
+                
+                $_SESSION['success'] = "บันทึกข้อมูลการบำรุงรักษาและอัพเดทสถานะครุภัณฑ์เรียบร้อยแล้ว";
+
+
             $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมเรียบร้อยแล้ว";
             header("Location: maintenance.php");
             exit();
