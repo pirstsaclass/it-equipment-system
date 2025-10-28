@@ -18,15 +18,19 @@ if (isset($_GET['action'])) {
 if ($_POST) {
     if (isset($_POST['add_maintenance'])) {
         try {
+            $equipment_id = $_POST['equipment_id'];
+            $new_status = $_POST['status'];
+            
+            // Insert maintenance record
             $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_name, building_name, floor_name, room_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
             $stmt->execute([
-                $_POST['equipment_id'],
+                $equipment_id,
                 $_POST['report_date'],
                 $_POST['problem_description'],
                 $_POST['reported_by'],
                 $_POST['assigned_technician'],
                 $_POST['cost'],
-                $_POST['status'],
+                $new_status,
                 $_POST['solution_description'],
                 $_POST['completed_date'],
                 $_POST['school_name'],
@@ -35,11 +39,29 @@ if ($_POST) {
                 $_POST['room_name']
             ]);
             
-            // อัพเดทสถานะ equipment เป็น 'รอซ่อม'
-            $update_stmt = $db->prepare("UPDATE equipment SET status = 'รอซ่อม' WHERE id = ?");
-            $update_stmt->execute([$_POST['equipment_id']]);
+            // Update equipment status based on maintenance status
+            $equipment_status = '';
+            switch ($new_status) {
+                case 'รอซ่อม':
+                    $equipment_status = 'รอซ่อม';
+                    break;
+                case 'กำลังดำเนินการ':
+                    $equipment_status = 'กำลังซ่อม';
+                    break;
+                case 'ซ่อมเสร็จ':
+                    $equipment_status = 'ซ่อมเสร็จแล้ว';
+                    break;
+                case 'ยกเลิก':
+                    // Don't change equipment status on cancellation
+                    break;
+            }
             
-            $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมเรียบร้อยแล้ว";
+            if ($equipment_status) {
+                $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
+                $update_stmt->execute([$equipment_status, $equipment_id]);
+            }
+            
+            $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมและอัปเดตสถานะครุภัณฑ์เรียบร้อยแล้ว";
             header("Location: maintenance.php");
             exit();
             
@@ -52,15 +74,24 @@ if ($_POST) {
     
     if (isset($_POST['edit_maintenance'])) {
         try {
+            $equipment_id = $_POST['equipment_id'];
+            $new_status = $_POST['status'];
+            
+            // Get old status before update
+            $old_status_stmt = $db->prepare("SELECT status FROM maintenance WHERE id = ?");
+            $old_status_stmt->execute([$_POST['id']]);
+            $old_status = $old_status_stmt->fetchColumn();
+            
+            // Update maintenance record
             $stmt = $db->prepare("UPDATE maintenance SET equipment_id=?, report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=?, updated_at=NOW() WHERE id=?");
             $stmt->execute([
-                $_POST['equipment_id'],
+                $equipment_id,
                 $_POST['report_date'],
                 $_POST['problem_description'],
                 $_POST['reported_by'],
                 $_POST['assigned_technician'],
                 $_POST['cost'],
-                $_POST['status'],
+                $new_status,
                 $_POST['solution_description'],
                 $_POST['completed_date'],
                 $_POST['school_name'],
@@ -70,32 +101,32 @@ if ($_POST) {
                 $_POST['id']
             ]);
             
-            // อัพเดทสถานะ equipment ตามสถานะ maintenance
-            $equipment_id = $_POST['equipment_id'];
-            $maintenance_status = $_POST['status'];
-            $equipment_status = '';
-            
-            switch($maintenance_status) {
-                case 'รอซ่อม':
-                    $equipment_status = 'รอซ่อม';
-                    break;
-                case 'กำลังดำเนินการ':
-                    $equipment_status = 'กำลังซ่อม';
-                    break;
-                case 'ซ่อมเสร็จ':
-                    $equipment_status = 'ซ่อมเสร็จแล้ว';
-                    break;
-                case 'ยกเลิก':
-                    $equipment_status = 'ใช้งานปกติ';
-                    break;
+            // Update equipment status based on maintenance status
+            if ($old_status != $new_status) {
+                $equipment_status = '';
+                switch ($new_status) {
+                    case 'รอซ่อม':
+                        $equipment_status = 'รอซ่อม';
+                        break;
+                    case 'กำลังดำเนินการ':
+                        $equipment_status = 'กำลังซ่อม';
+                        break;
+                    case 'ซ่อมเสร็จ':
+                        $equipment_status = 'ซ่อมเสร็จแล้ว';
+                        break;
+                    case 'ยกเลิก':
+                        // Return to previous status or set to normal
+                        $equipment_status = 'ใช้งานปกติ';
+                        break;
+                }
+                
+                if ($equipment_status) {
+                    $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
+                    $update_stmt->execute([$equipment_status, $equipment_id]);
+                }
             }
             
-            if ($equipment_status) {
-                $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
-                $update_stmt->execute([$equipment_status, $equipment_id]);
-            }
-            
-            $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมเรียบร้อยแล้ว";
+            $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมและอัปเดตสถานะครุภัณฑ์เรียบร้อยแล้ว";
             header("Location: maintenance.php");
             exit();
             
@@ -105,47 +136,10 @@ if ($_POST) {
             exit();
         }
     }
-    
-    // ส่วนสำหรับอัพเดทสถานะอย่างเดียว
-    if (isset($_POST['update_maintenance_status'])) {
-        $maintenance_id = $_POST['maintenance_id'];
-        $new_status = $_POST['status'];
-        $equipment_id = $_POST['equipment_id'];
-        
-        // Update maintenance status
-        $stmt = $db->prepare("UPDATE maintenance SET status = ? WHERE id = ?");
-        $stmt->execute([$new_status, $maintenance_id]);
-        
-        // Update equipment status based on maintenance status
-        $equipment_status = '';
-        switch ($new_status) {
-            case 'รอซ่อม':
-                $equipment_status = 'รอซ่อม';
-                break;
-            case 'กำลังดำเนินการ':
-                $equipment_status = 'กำลังซ่อม';
-                break;
-            case 'ซ่อมเสร็จ':
-                $equipment_status = 'ซ่อมเสร็จแล้ว';
-                break;
-            case 'ยกเลิก':
-                $equipment_status = 'ใช้งานปกติ';
-                break;
-        }
-        
-        if ($equipment_status) {
-            $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
-            $update_stmt->execute([$equipment_status, $equipment_id]);
-        }
-        
-        $_SESSION['success'] = "อัพเดทสถานะการบำรุงรักษาและสถานะครุภัณฑ์เรียบร้อยแล้ว";
-        header("Location: maintenance.php");
-        exit();
-    }
 }
 
 // Get maintenance list with location data
-$maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, e.id as equipment_id,
+$maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, e.id as equipment_id, e.status as equipment_status,
                              c.name as category_name, ci.name as item_name
                       FROM maintenance m 
                       JOIN equipment e ON m.equipment_id = e.id 
@@ -155,7 +149,7 @@ $maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, e.id as equi
 $maintenance_list = $db->query($maintenance_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get equipment for dropdown
-$equipment_list = $db->query("SELECT e.id, e.code, e.name, c.name as category_name, ci.name as item_name 
+$equipment_list = $db->query("SELECT e.id, e.code, e.name, e.status, c.name as category_name, ci.name as item_name 
                               FROM equipment e 
                               LEFT JOIN categories c ON e.category_id = c.id 
                               LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
@@ -173,14 +167,14 @@ $frequent_repair_query = "
     ORDER BY repair_count DESC";
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// ข้อมูลโรงเรียนจาก PHP (สำหรับ dropdown เริ่มต้น)
+// ข้อมูลโรงเรียนจาก PHP
 $schools = [
     "โรงเรียนวารีเชียงใหม่" => "VCS",
     "โรงเรียนอนุบาลวารีเชียงใหม่" => "VKS", 
     "โรงเรียนนานาชาติวารีเชียงใหม่" => "VCIS"
 ];
 
-// ข้อมูลห้อง (ใช้ร่วมกันทุกชั้น)
+// ข้อมูลห้อง
 $rooms = [
     "ห้อง 101", "ห้อง 102", "ห้อง 103", "ห้อง 104", "ห้อง 105",
     "ห้อง 201", "ห้อง 202", "ห้อง 203", "ห้อง 204", "ห้อง 205", 
@@ -229,11 +223,7 @@ include 'includes/sidebar.php';
         <h6><i class="fas fa-exclamation-triangle"></i> อุปกรณ์ที่ซ่อมบ่อย</h6>
         <ul class="mb-0">
             <?php foreach($frequent_repairs as $freq): ?>
-            <li>
-                <a href="equipment_detail.php?id=<?php echo $freq['id'] ?? ''; ?>" class="text-decoration-none">
-                    <?php echo $freq['code'] . ' - ' . $freq['name'] . ' (ซ่อมแล้ว ' . $freq['repair_count'] . ' ครั้ง)'; ?>
-                </a>
-            </li>
+            <li><?php echo $freq['code'] . ' - ' . $freq['name'] . ' (ซ่อมแล้ว ' . $freq['repair_count'] . ' ครั้ง)'; ?></li>
             <?php endforeach; ?>
         </ul>
     </div>
@@ -255,7 +245,8 @@ include 'includes/sidebar.php';
                             <th width="110">วันที่แจ้งซ่อม</th>
                             <th width="120">ผู้แจ้งซ่อม</th>
                             <th width="120">ผู้ดำเนินการ</th>
-                            <th width="100">สถานะ</th>
+                            <th width="100">สถานะซ่อม</th>
+                            <th width="100">สถานะครุภัณฑ์</th>
                             <th width="90">จัดการ</th>
                         </tr>
                     </thead>
@@ -318,6 +309,24 @@ include 'includes/sidebar.php';
                                 ?>
                                 <span class="badge bg-<?php echo $status_class; ?>">
                                     <?php echo $maintenance['status']; ?>
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <?php 
+                                $equip_status_badge = [
+                                    'ใหม่' => 'success',
+                                    'ใช้งานปกติ' => 'primary',
+                                    'ชำรุด' => 'warning',
+                                    'รอซ่อม' => 'info',
+                                    'กำลังซ่อม' => 'warning',
+                                    'ซ่อมเสร็จแล้ว' => 'success',
+                                    'ส่งคืนแล้ว' => 'primary',
+                                    'จำหน่ายแล้ว' => 'danger'
+                                ];
+                                $equip_status_class = $equip_status_badge[$maintenance['equipment_status']] ?? 'secondary';
+                                ?>
+                                <span class="badge bg-<?php echo $equip_status_class; ?>">
+                                    <?php echo $maintenance['equipment_status']; ?>
                                 </span>
                             </td>
                             <td class="text-center">
@@ -392,14 +401,17 @@ include 'includes/sidebar.php';
                         </div>
                         <div class="col-12 mb-3">
                             <label class="form-label">เลือกครุภัณฑ์ *</label>
-                            <select class="form-control" name="equipment_id" id="equipment_id" required>
+                            <select class="form-control" name="equipment_id" id="equipment_id" required onchange="showEquipmentStatus()">
                                 <option value="">เลือกครุภัณฑ์</option>
                                 <?php foreach($equipment_list as $equipment): ?>
-                                <option value="<?php echo $equipment['id']; ?>">
-                                    <?php echo $equipment['code'] . ' - ' . $equipment['name'] . ' (' . $equipment['category_name'] . ')'; ?>
+                                <option value="<?php echo $equipment['id']; ?>" data-status="<?php echo $equipment['status']; ?>">
+                                    <?php echo $equipment['code'] . ' - ' . $equipment['name'] . ' (' . $equipment['category_name'] . ') - สถานะ: ' . $equipment['status']; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <div id="equipmentStatusAlert" class="alert alert-info mt-2" style="display: none;">
+                                <small><i class="fas fa-info-circle"></i> <span id="equipmentStatusText"></span></small>
+                            </div>
                         </div>
                     </div>
 
@@ -465,6 +477,7 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
+
 // ข้อมูลโรงเรียน ตึก และชั้น
 const schoolData = {
     "โรงเรียนวารีเชียงใหม่": {

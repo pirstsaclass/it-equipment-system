@@ -27,32 +27,6 @@ if (isset($_GET['action'])) {
     }
 }
 
-// Function to update maintenance status from equipment
-function updateMaintenanceStatusFromEquipment($db, $equipment_id, $equipment_status) {
-    $maintenance_status = '';
-    
-    // Map equipment status to maintenance status
-    switch($equipment_status) {
-        case 'รอซ่อม':
-            $maintenance_status = 'รอซ่อม';
-            break;
-        case 'กำลังซ่อม':
-            $maintenance_status = 'กำลังดำเนินการ';
-            break;
-        case 'ซ่อมเสร็จแล้ว':
-            $maintenance_status = 'ซ่อมเสร็จ';
-            break;
-        case 'ใช้งานปกติ':
-            $maintenance_status = 'ซ่อมเสร็จ';
-            break;
-    }
-    
-    if ($maintenance_status) {
-        $stmt = $db->prepare("UPDATE maintenance SET status = ? WHERE equipment_id = ? AND status != 'ยกเลิก'");
-        $stmt->execute([$maintenance_status, $equipment_id]);
-    }
-}
-
 if ($_POST) {
     if (isset($_POST['add_equipment'])) {
         // Handle image upload
@@ -63,11 +37,9 @@ if ($_POST) {
                 mkdir($upload_dir, 0777, true);
             }
             
-            // ใช้รหัสครุภัณฑ์และชื่อครุภัณฑ์เป็นชื่อไฟล์
             $equipment_code = $_POST['code'];
             $equipment_name = $_POST['name'];
             
-            // ทำความสะอาดชื่อไฟล์ (ลบอักขระพิษ)
             $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
             $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
             
@@ -75,10 +47,8 @@ if ($_POST) {
             $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
             $image_path = $upload_dir . $file_name;
             
-            // ตรวจสอบประเภทไฟล์
             $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
             if (in_array($file_extension, $allowed_extensions)) {
-                // ตรวจสอบขนาดไฟล์ (ไม่เกิน 5MB)
                 if ($_FILES['image']['size'] <= 5 * 1024 * 1024) {
                     if (move_uploaded_file($_FILES['image']['tmp_name'], $image_path)) {
                         $image_filename = $file_name;
@@ -111,12 +81,6 @@ if ($_POST) {
                 $_POST['specifications'],
                 $image_filename
             ]);
-            
-            $equipment_id = $db->lastInsertId();
-            
-            // อัพเดทสถานะใน maintenance ถ้ามีการซ่อมบำรุงที่เกี่ยวข้อง
-            updateMaintenanceStatusFromEquipment($db, $equipment_id, $_POST['status']);
-            
             $_SESSION['success'] = "เพิ่มข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
             header("Location: equipment.php");
             exit();
@@ -124,84 +88,123 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_equipment'])) {
-        // Handle image upload
-        $image_filename = $_POST['current_image'];
-        
-        if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-            // Delete old image
-            if ($image_filename) {
-                $old_image_path = 'uploads/img_equipment/' . $image_filename;
-                if (file_exists($old_image_path)) {
-                    unlink($old_image_path);
+        try {
+            // Get old status before update
+            $old_status_stmt = $db->prepare("SELECT status FROM equipment WHERE id = ?");
+            $old_status_stmt->execute([$_POST['id']]);
+            $old_status = $old_status_stmt->fetchColumn();
+            
+            $new_status = $_POST['status'];
+            
+            // Handle image upload
+            $image_filename = $_POST['current_image'];
+            
+            if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
+                // Delete old image
+                if ($image_filename) {
+                    $old_image_path = 'uploads/img_equipment/' . $image_filename;
+                    if (file_exists($old_image_path)) {
+                        unlink($old_image_path);
+                    }
                 }
-            }
-            
-            $upload_dir = 'uploads/img_equipment/';
-            if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
-            }
-            
-            // ใช้รหัสครุภัณฑ์และชื่อครุภัณฑ์เป็นชื่อไฟล์
-            $equipment_code = $_POST['code'];
-            $equipment_name = $_POST['name'];
-            
-            // ทำความสะอาดชื่อไฟล์ (ลบอักขระพิษ)
-            $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
-            $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
-            
-            $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-            $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
-            $image_path = $upload_dir . $file_name;
-            
-            // ตรวจสอบประเภทไฟล์
-            $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-            if (in_array($file_extension, $allowed_extensions)) {
-                // ตรวจสอบขนาดไฟล์ (ไม่เกิน 5MB)
-                if ($_FILES['image']['size'] <= 5 * 1024 * 1024) {
-                    if (move_uploaded_file($_FILES['image']['tmp_name'], $image_path)) {
-                        $image_filename = $file_name;
+                
+                $upload_dir = 'uploads/img_equipment/';
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0777, true);
+                }
+                
+                $equipment_code = $_POST['code'];
+                $equipment_name = $_POST['name'];
+                
+                $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
+                $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
+                
+                $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+                $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
+                $image_path = $upload_dir . $file_name;
+                
+                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                if (in_array($file_extension, $allowed_extensions)) {
+                    if ($_FILES['image']['size'] <= 5 * 1024 * 1024) {
+                        if (move_uploaded_file($_FILES['image']['tmp_name'], $image_path)) {
+                            $image_filename = $file_name;
+                        } else {
+                            $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัพโหลดไฟล์";
+                        }
                     } else {
-                        $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัพโหลดไฟล์";
+                        $_SESSION['error'] = "ขนาดไฟล์ต้องไม่เกิน 5MB";
                     }
                 } else {
-                    $_SESSION['error'] = "ขนาดไฟล์ต้องไม่เกิน 5MB";
+                    $_SESSION['error'] = "รองรับเฉพาะไฟล์รูปภาพ (JPG, JPEG, PNG, GIF, WEBP)";
                 }
-            } else {
-                $_SESSION['error'] = "รองรับเฉพาะไฟล์รูปภาพ (JPG, JPEG, PNG, GIF, WEBP)";
             }
-        }
-        
-        if (!isset($_SESSION['error'])) {
-            $stmt = $db->prepare("UPDATE equipment SET code=?, name=?, category_id=?, category_item_id=?, brand=?, model=?, serial_number=?, purchase_date=?, purchase_price=?, department_id=?, responsible_person=?, status=?, specifications=?, image=? WHERE id=?");
-            $stmt->execute([
-                $_POST['code'],
-                $_POST['name'],
-                $_POST['category_id'],
-                $_POST['category_item_id'],
-                $_POST['brand'],
-                $_POST['model'],
-                $_POST['serial_number'],
-                $_POST['purchase_date'],
-                $_POST['purchase_price'],
-                $_POST['department_id'],
-                $_POST['responsible_person'],
-                $_POST['status'],
-                $_POST['specifications'],
-                $image_filename,
-                $_POST['id']
-            ]);
             
-            // อัพเดทสถานะใน maintenance
-            updateMaintenanceStatusFromEquipment($db, $_POST['id'], $_POST['status']);
-            
-            $_SESSION['success'] = "แก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
+            if (!isset($_SESSION['error'])) {
+                // Update equipment
+                $stmt = $db->prepare("UPDATE equipment SET code=?, name=?, category_id=?, category_item_id=?, brand=?, model=?, serial_number=?, purchase_date=?, purchase_price=?, department_id=?, responsible_person=?, status=?, specifications=?, image=? WHERE id=?");
+                $stmt->execute([
+                    $_POST['code'],
+                    $_POST['name'],
+                    $_POST['category_id'],
+                    $_POST['category_item_id'],
+                    $_POST['brand'],
+                    $_POST['model'],
+                    $_POST['serial_number'],
+                    $_POST['purchase_date'],
+                    $_POST['purchase_price'],
+                    $_POST['department_id'],
+                    $_POST['responsible_person'],
+                    $new_status,
+                    $_POST['specifications'],
+                    $image_filename,
+                    $_POST['id']
+                ]);
+                
+                // Update maintenance status if equipment status changed
+                if ($old_status != $new_status) {
+                    // Check for active maintenance records
+                    $check_maintenance = $db->prepare("SELECT id FROM maintenance WHERE equipment_id = ? AND status NOT IN ('ซ่อมเสร็จ', 'ยกเลิก')");
+                    $check_maintenance->execute([$_POST['id']]);
+                    
+                    if ($check_maintenance->rowCount() > 0) {
+                        // Map equipment status to maintenance status
+                        $maintenance_status = '';
+                        switch ($new_status) {
+                            case 'รอซ่อม':
+                                $maintenance_status = 'รอซ่อม';
+                                break;
+                            case 'กำลังซ่อม':
+                                $maintenance_status = 'กำลังดำเนินการ';
+                                break;
+                            case 'ซ่อมเสร็จแล้ว':
+                            case 'ใช้งานปกติ':
+                                $maintenance_status = 'ซ่อมเสร็จ';
+                                break;
+                            case 'ส่งคืนแล้ว':
+                                $maintenance_status = 'ซ่อมเสร็จ';
+                                break;
+                        }
+                        
+                        if ($maintenance_status) {
+                            $update_maintenance = $db->prepare("UPDATE maintenance SET status = ?, updated_at = NOW() WHERE equipment_id = ? AND status NOT IN ('ซ่อมเสร็จ', 'ยกเลิก')");
+                            $update_maintenance->execute([$maintenance_status, $_POST['id']]);
+                        }
+                    }
+                }
+                
+                $_SESSION['success'] = "แก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
+                header("Location: equipment.php");
+                exit();
+            }
+        } catch (PDOException $e) {
+            $_SESSION['error'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
             header("Location: equipment.php");
             exit();
         }
     }
 }
 
-// รับค่าการค้นหาและกรอง
+// รับค่าการค้นหาและกรองข้อมูล
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $filter_department = isset($_GET['department']) ? $_GET['department'] : '';
 $filter_status = isset($_GET['status']) ? $_GET['status'] : '';
@@ -244,8 +247,6 @@ $total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
 
 // ตั้งค่า pagination
 $total_pages = ceil($total_records / $records_per_page);
-
-// รับค่าหน้าปัจจุบัน
 $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
@@ -379,16 +380,6 @@ include 'includes/sidebar.php';
                         <?php endif; ?>
                     </div>
                 </div>
-                <!-- Keep hidden inputs for persistence -->
-                <?php if (!empty($search)): ?>
-                    <input type="hidden" name="search" value="<?php echo htmlspecialchars($search); ?>">
-                <?php endif; ?>
-                <?php if (!empty($filter_department)): ?>
-                    <input type="hidden" name="department" value="<?php echo $filter_department; ?>">
-                <?php endif; ?>
-                <?php if (!empty($filter_status)): ?>
-                    <input type="hidden" name="status" value="<?php echo $filter_status; ?>">
-                <?php endif; ?>
             </form>
 
             <!-- สถิติการค้นหา -->
@@ -423,21 +414,6 @@ include 'includes/sidebar.php';
                         | หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?>
                     <?php endif; ?>
                 </div>
-                
-                <!-- Dropdown เลือกหน้า (สำหรับหน้าจอเล็ก) -->
-                <?php if ($total_pages > 1): ?>
-                <div class="d-md-none">
-                    <select class="form-select form-select-sm" onchange="window.location.href=this.value">
-                        <option value="">เลือกหน้า...</option>
-                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                            <option value="<?php echo getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page); ?>" 
-                                <?php echo ($i == $current_page) ? 'selected' : ''; ?>>
-                                หน้า <?php echo $i; ?>
-                            </option>
-                        <?php endfor; ?>
-                    </select>
-                </div>
-                <?php endif; ?>
             </div>
 
             <div class="table-responsive">
@@ -458,11 +434,7 @@ include 'includes/sidebar.php';
                         <?php if (count($equipment_list) > 0): ?>
                             <?php foreach($equipment_list as $equipment): ?>
                             <tr>
-                                <td class="fw-bold text-primary">
-                                    <a href="equipment_detail.php?id=<?php echo $equipment['id']; ?>" class="text-decoration-none" title="ดูรายละเอียดครุภัณฑ์">
-                                        <?php echo $equipment['code']; ?>
-                                    </a>
-                                </td>
+                                <td class="fw-bold text-primary"><?php echo $equipment['code']; ?></td>
                                 <td><?php echo $equipment['name']; ?></td>
                                 <td>
                                     <span class="badge bg-secondary"><?php echo $equipment['category_name']; ?></span>
@@ -482,7 +454,6 @@ include 'includes/sidebar.php';
                                         'จำหน่ายแล้ว' => 'danger'
                                     ];
                                     ?>
-
                                     <span class="badge bg-<?php echo $status_badge[$equipment['status']] ?? 'secondary'; ?>">
                                         <?php echo $equipment['status']; ?>
                                     </span>
@@ -524,35 +495,28 @@ include 'includes/sidebar.php';
             <?php if ($total_pages > 1): ?>
             <nav aria-label="Page navigation">
                 <div class="d-flex justify-content-between align-items-center">
-                    <!-- ข้อมูลสรุป -->
                     <div class="text-muted small d-none d-md-block">
                         หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?> 
                         (ทั้งหมด <?php echo number_format($total_records); ?> รายการ)
                     </div>
                     
-                    <!-- Pagination Links -->
                     <ul class="pagination justify-content-center mb-0">
-                        <!-- First Page -->
                         <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
                             <a class="page-link" href="<?php echo getPageUrl(1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="First">
                                 <span aria-hidden="true">&laquo;&laquo;</span>
                             </a>
                         </li>
                         
-                        <!-- Previous Page -->
                         <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
                             <a class="page-link" href="<?php echo getPageUrl($current_page - 1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Previous">
                                 <span aria-hidden="true">&laquo;</span>
                             </a>
                         </li>
 
-                        <!-- Page Numbers -->
                         <?php
-                        // คำนวณช่วงหน้าที่จะแสดง
                         $start_page = max(1, $current_page - 2);
                         $end_page = min($total_pages, $current_page + 2);
                         
-                        // แสดง ... หน้าหากไม่เริ่มจากหน้า 1
                         if ($start_page > 1) {
                             echo '<li class="page-item"><a class="page-link" href="' . getPageUrl(1, $search, $filter_department, $filter_status, $records_per_page) . '">1</a></li>';
                             if ($start_page > 2) {
@@ -560,13 +524,11 @@ include 'includes/sidebar.php';
                             }
                         }
                         
-                        // แสดงเลขหน้า
                         for ($i = $start_page; $i <= $end_page; $i++) {
                             $active = $i == $current_page ? 'active' : '';
                             echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page) . '">' . $i . '</a></li>';
                         }
                         
-                        // แสดง ... หลังหากไม่จบที่หน้าสุดท้าย
                         if ($end_page < $total_pages) {
                             if ($end_page < $total_pages - 1) {
                                 echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
@@ -575,35 +537,18 @@ include 'includes/sidebar.php';
                         }
                         ?>
 
-                        <!-- Next Page -->
                         <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
                             <a class="page-link" href="<?php echo getPageUrl($current_page + 1, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Next">
                                 <span aria-hidden="true">&raquo;</span>
                             </a>
                         </li>
                         
-                        <!-- Last Page -->
                         <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
                             <a class="page-link" href="<?php echo getPageUrl($total_pages, $search, $filter_department, $filter_status, $records_per_page); ?>" aria-label="Last">
                                 <span aria-hidden="true">&raquo;&raquo;</span>
                             </a>
                         </li>
                     </ul>
-                    
-                    <!-- Dropdown เลือกหน้า (สำหรับหน้าจอใหญ่) -->
-                    <div class="d-none d-md-block">
-                        <div class="input-group input-group-sm" style="width: 120px;">
-                            <span class="input-group-text">หน้า</span>
-                            <select class="form-select" onchange="window.location.href=this.value">
-                                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                    <option value="<?php echo getPageUrl($i, $search, $filter_department, $filter_status, $records_per_page); ?>" 
-                                        <?php echo ($i == $current_page) ? 'selected' : ''; ?>>
-                                        <?php echo $i; ?>
-                                    </option>
-                                <?php endfor; ?>
-                            </select>
-                        </div>
-                    </div>
                 </div>
             </nav>
             <?php endif; ?>
@@ -703,19 +648,19 @@ include 'includes/sidebar.php';
                             
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                <label class="form-label">สถานะ</label>
-                                <select class="form-control" name="status" id="status">
-                                    <option value="ใหม่">ใหม่</option>
-                                    <option value="ใช้งานปกติ" selected>ใช้งานปกติ</option>
-                                    <option value="ชำรุด">ชำรุด</option>
-                                    <option value="รอซ่อม">รอซ่อม</option>
-                                    <option value="กำลังซ่อม">กำลังซ่อม</option>
-                                    <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
-                                    <option value="ส่งคืนแล้ว">ส่งคืนแล้ว</option>
-                                    <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
-                                </select>
+                                    <label class="form-label">สถานะ *</label>
+                                    <select class="form-control" name="status" id="status" required>
+                                        <option value="ใหม่">ใหม่</option>
+                                        <option value="ใช้งานปกติ" selected>ใช้งานปกติ</option>
+                                        <option value="ชำรุด">ชำรุด</option>
+                                        <option value="รอซ่อม">รอซ่อม</option>
+                                        <option value="กำลังซ่อม">กำลังซ่อม</option>
+                                        <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
+                                        <option value="ส่งคืนแล้ว">ส่งคืนแล้ว</option>
+                                        <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
+                                    </select>
+                                </div>
                             </div>
-                            </div>                            
                             
                             <div class="mb-3">
                                 <label class="form-label">รายละเอียดคุณสมบัติ</label>
@@ -758,7 +703,6 @@ include 'includes/sidebar.php';
             </div>
             <div class="modal-body">
                 <div class="row">
-                    <!-- รูปภาพครุภัณฑ์ - แสดงเฉพาะในโมดอลรายละเอียด -->
                     <div class="col-md-4 text-center mb-4">
                         <div id="viewImageContainer">
                             <img id="viewImage" src="" alt="Equipment Image" class="img-fluid rounded border shadow" style="max-height: 300px; display: none;">
@@ -769,7 +713,6 @@ include 'includes/sidebar.php';
                         </div>
                     </div>
                     
-                    <!-- รายละเอียดครุภัณฑ์ -->
                     <div class="col-md-8">
                         <div class="row mb-3">
                             <div class="col-12">
@@ -837,7 +780,6 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
-// Clear form function
 function clearForm() {
     document.getElementById('equipmentForm').reset();
     document.getElementById('equipment_id').value = '';
@@ -847,12 +789,10 @@ function clearForm() {
     document.getElementById('submitBtn').textContent = 'บันทึก';
     document.getElementById('category_item_id').innerHTML = '<option value="">เลือกรายการอุปกรณ์</option>';
     
-    // Reset image preview
     document.getElementById('imagePreview').style.display = 'none';
     document.getElementById('noImagePlaceholder').style.display = 'block';
 }
 
-// Edit equipment function
 function editEquipment(equipment) {
     document.getElementById('equipment_id').value = equipment.id;
     document.getElementById('code').value = equipment.code;
@@ -869,12 +809,10 @@ function editEquipment(equipment) {
     document.getElementById('specifications').value = equipment.specifications || '';
     document.getElementById('current_image').value = equipment.image || '';
     
-    // Load category items and set selected value
     if (equipment.category_id) {
         loadCategoryItems(equipment.category_id, equipment.category_item_id);
     }
     
-    // Show image preview if exists
     if (equipment.image) {
         document.getElementById('imagePreview').src = 'uploads/img_equipment/' + equipment.image;
         document.getElementById('imagePreview').style.display = 'block';
@@ -889,9 +827,7 @@ function editEquipment(equipment) {
     document.getElementById('submitBtn').textContent = 'อัพเดท';
 }
 
-// View equipment function - แสดงรูปภาพเฉพาะในโมดอลรายละเอียด
 function viewEquipment(equipment) {
-    // ตั้งค่าข้อมูลพื้นฐาน
     document.getElementById('viewName').textContent = equipment.name;
     document.getElementById('viewCode').textContent = equipment.code;
     document.getElementById('viewCategory').textContent = equipment.category_name || '-';
@@ -906,27 +842,24 @@ function viewEquipment(equipment) {
     document.getElementById('viewResponsible').textContent = equipment.responsible_person || '-';
     document.getElementById('viewSpecifications').textContent = equipment.specifications || '-';
     
-    // Status badge
-const statusBadges = {
-    'ใหม่': 'success',
-    'ใช้งานปกติ': 'primary',
-    'ชำรุด': 'warning',
-    'รอซ่อม': 'info',
-    'กำลังซ่อม': 'warning',
-    'ซ่อมเสร็จแล้ว': 'success',
-    'ส่งคืนแล้ว': 'primary',
-    'จำหน่ายแล้ว': 'danger'
-};
+    const statusBadges = {
+        'ใหม่': 'success',
+        'ใช้งานปกติ': 'primary',
+        'ชำรุด': 'warning',
+        'รอซ่อม': 'info',
+        'กำลังซ่อม': 'warning',
+        'ซ่อมเสร็จแล้ว': 'success',
+        'ส่งคืนแล้ว': 'primary',
+        'จำหน่ายแล้ว': 'danger'
+    };
     const badgeClass = statusBadges[equipment.status] || 'secondary';
     document.getElementById('viewStatus').innerHTML = `<span class="badge bg-${badgeClass}">${equipment.status}</span>`;
     
-    // จัดการแสดงรูปภาพ - แสดงเฉพาะในโมดอลรายละเอียด
     if (equipment.image) {
         document.getElementById('viewImage').src = 'uploads/img_equipment/' + equipment.image;
         document.getElementById('viewImage').style.display = 'block';
         document.getElementById('viewNoImage').style.display = 'none';
         document.getElementById('viewImage').onerror = function() {
-            // หากโหลดรูปภาพไม่สำเร็จ ให้แสดง placeholder
             this.style.display = 'none';
             document.getElementById('viewNoImage').style.display = 'block';
         };
@@ -936,7 +869,6 @@ const statusBadges = {
     }
 }
 
-// Preview image function
 function previewImage(event) {
     const file = event.target.files[0];
     if (file) {
@@ -950,7 +882,6 @@ function previewImage(event) {
     }
 }
 
-// Function to load category items - แก้ไขปัญหา "undefined"
 function loadCategoryItems(categoryId, selectedItemId = null) {
     if (categoryId) {
         fetch('get_category_items.php?category_id=' + categoryId)
@@ -959,7 +890,6 @@ function loadCategoryItems(categoryId, selectedItemId = null) {
                 const itemSelect = document.getElementById('category_item_id');
                 itemSelect.innerHTML = '<option value="">เลือกรายการอุปกรณ์</option>';
                 data.forEach(item => {
-                    // ใช้ชื่ออย่างเดียวแทนที่จะแสดงรหัส เพื่อหลีกเลี่ยงปัญหา "undefined"
                     const optionText = item.name;
                     const selected = selectedItemId && item.id == selectedItemId ? 'selected' : '';
                     itemSelect.innerHTML += `<option value="${item.id}" ${selected}>${optionText}</option>`;
@@ -974,7 +904,6 @@ function loadCategoryItems(categoryId, selectedItemId = null) {
     }
 }
 
-// เมื่อโมดอลปิด ให้รีเซ็ตรูปภาพ
 document.addEventListener('DOMContentLoaded', function() {
     var viewModal = document.getElementById('viewModal');
     viewModal.addEventListener('hidden.bs.modal', function () {
@@ -983,21 +912,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('viewNoImage').style.display = 'block';
     });
 });
-
-// Function สำหรับการเปลี่ยนหน้าแบบเร็ว
-function goToPage(page) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('page', page);
-    window.location.href = url.toString();
-}
-
-// Function สำหรับเปลี่ยนจำนวนรายการต่อหน้า
-function changePerPage(perPage) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('per_page', perPage);
-    url.searchParams.set('page', 1); // กลับไปหน้าที่ 1 เมื่อเปลี่ยนจำนวนต่อหน้า
-    window.location.href = url.toString();
-}
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
