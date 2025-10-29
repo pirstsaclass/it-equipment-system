@@ -160,38 +160,6 @@ if ($_POST) {
                     $_POST['id']
                 ]);
                 
-                // Update maintenance status if equipment status changed
-                if ($old_status != $new_status) {
-                    // Check for active maintenance records
-                    $check_maintenance = $db->prepare("SELECT id FROM maintenance WHERE equipment_id = ? AND status NOT IN ('ซ่อมเสร็จ', 'ยกเลิก')");
-                    $check_maintenance->execute([$_POST['id']]);
-                    
-                    if ($check_maintenance->rowCount() > 0) {
-                        // Map equipment status to maintenance status
-                        $maintenance_status = '';
-                        switch ($new_status) {
-                            case 'รอซ่อม':
-                                $maintenance_status = 'รอซ่อม';
-                                break;
-                            case 'กำลังซ่อม':
-                                $maintenance_status = 'กำลังดำเนินการ';
-                                break;
-                            case 'ซ่อมเสร็จแล้ว':
-                            case 'ใช้งานปกติ':
-                                $maintenance_status = 'ซ่อมเสร็จ';
-                                break;
-                            case 'ส่งคืนแล้ว':
-                                $maintenance_status = 'ซ่อมเสร็จ';
-                                break;
-                        }
-                        
-                        if ($maintenance_status) {
-                            $update_maintenance = $db->prepare("UPDATE maintenance SET status = ?, updated_at = NOW() WHERE equipment_id = ? AND status NOT IN ('ซ่อมเสร็จ', 'ยกเลิก')");
-                            $update_maintenance->execute([$maintenance_status, $_POST['id']]);
-                        }
-                    }
-                }
-                
                 $_SESSION['success'] = "แก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
                 header("Location: equipment.php");
                 exit();
@@ -250,15 +218,19 @@ $total_pages = ceil($total_records / $records_per_page);
 $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
-// Get equipment list with pagination and search
-$equipment_query = "SELECT e.*, c.name as category_name, ci.name as item_name, d.name as department_name 
-    FROM equipment e 
-    LEFT JOIN categories c ON e.category_id = c.id 
-    LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-    LEFT JOIN departments d ON e.department_id = d.id 
-    $where_clause 
-    ORDER BY e.created_at DESC 
-    LIMIT $offset, $records_per_page";
+// Get equipment list with pagination and search - แก้ไข query
+$equipment_query = "SELECT e.*, c.name as category_name, ci.name as item_name, d.name as department_name,
+                           (SELECT m.status FROM maintenance m 
+                            WHERE m.equipment_id = e.id 
+                            ORDER BY m.created_at DESC 
+                            LIMIT 1) as maintenance_status
+                    FROM equipment e 
+                    LEFT JOIN categories c ON e.category_id = c.id 
+                    LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
+                    LEFT JOIN departments d ON e.department_id = d.id 
+                    $where_clause 
+                    ORDER BY e.created_at DESC 
+                    LIMIT $offset, $records_per_page";
 
 $stmt = $db->prepare($equipment_query);
 $stmt->execute($params);
@@ -347,17 +319,11 @@ include 'includes/sidebar.php';
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label fw-bold">สถานะ</label>
+                        <label class="form-label fw-bold">สถานะอุปกรณ์</label>
                         <select class="form-control" name="status" onchange="this.form.submit()">
                             <option value="">-- ทุกสถานะ --</option>
-                            <option value="ใหม่" <?php echo ($filter_status == 'ใหม่') ? 'selected' : ''; ?>>ใหม่</option>
-                            <option value="ใช้งานปกติ" <?php echo ($filter_status == 'ใช้งานปกติ') ? 'selected' : ''; ?>>ใช้งานปกติ</option>
-                            <option value="ชำรุด" <?php echo ($filter_status == 'ชำรุด') ? 'selected' : ''; ?>>ชำรุด</option>
-                            <option value="รอซ่อม" <?php echo ($filter_status == 'รอซ่อม') ? 'selected' : ''; ?>>รอซ่อม</option>
-                            <option value="กำลังซ่อม" <?php echo ($filter_status == 'กำลังซ่อม') ? 'selected' : ''; ?>>กำลังซ่อม</option>
-                            <option value="ซ่อมเสร็จแล้ว" <?php echo ($filter_status == 'ซ่อมเสร็จแล้ว') ? 'selected' : ''; ?>>ซ่อมเสร็จแล้ว</option>
-                            <option value="ส่งคืนแล้ว" <?php echo ($filter_status == 'ส่งคืนแล้ว') ? 'selected' : ''; ?>>ส่งคืนแล้ว</option>
-                            <option value="จำหน่ายแล้ว" <?php echo ($filter_status == 'จำหน่ายแล้ว') ? 'selected' : ''; ?>>จำหน่ายแล้ว</option>
+                            <option value="อุปกรณ์ใหม่" <?php echo ($filter_status == 'อุปกรณ์ใหม่') ? 'selected' : ''; ?>>อุปกรณ์ใหม่</option>
+                            <option value="อุปกรณ์เดิม" <?php echo ($filter_status == 'อุปกรณ์เดิม') ? 'selected' : ''; ?>>อุปกรณ์เดิม</option>
                         </select>
                     </div>
                                         
@@ -425,7 +391,8 @@ include 'includes/sidebar.php';
                             <th width="14%">หมวดหมู่</th>
                             <th width="14%">รายการอุปกรณ์</th>
                             <th width="14%">แผนก</th>
-                            <th width="10%">สถานะ</th>
+                            <th width="10%">สถานะอุปกรณ์</th>
+                            <th width="10%">สถานะซ่อม</th>
                             <th width="10%">วันที่จัดซื้อ</th>
                             <th width="18%">จัดการ</th>
                         </tr>
@@ -444,18 +411,36 @@ include 'includes/sidebar.php';
                                 <td>
                                     <?php 
                                     $status_badge = [
-                                        'ใหม่' => 'success',
-                                        'ใช้งานปกติ' => 'primary',
-                                        'ชำรุด' => 'warning',
+                                        'อุปกรณ์ใหม่' => 'success',
+                                        'อุปกรณ์เดิม' => 'primary',
+                                        'อุปกรณ์ใหม่-ซ่อมเสร็จ' => 'success',
+                                        'อุปกรณ์เดิม-ซ่อมเสร็จ' => 'primary',
                                         'รอซ่อม' => 'info',
                                         'กำลังซ่อม' => 'warning',
+                                        'ใช้งานปกติ' => 'primary',
+                                        'ชำรุด' => 'warning',
                                         'ซ่อมเสร็จแล้ว' => 'success',
                                         'ส่งคืนแล้ว' => 'primary',
                                         'จำหน่ายแล้ว' => 'danger'
                                     ];
                                     ?>
-                                    <span class="badge bg-<?php echo $status_badge[$equipment['status']] ?? 'secondary'; ?>">
+                                    <span class="badge bg-<?php echo $status_badge[$equipment['status']] ?? 'secondary'; ?>" style="max-width: 120px; white-space: normal; word-wrap: break-word; line-height: 1.2;">
                                         <?php echo $equipment['status']; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php 
+                                    $maintenance_status_badge = [
+                                        'รอซ่อม' => 'warning',
+                                        'กำลังดำเนินการ' => 'info',
+                                        'ซ่อมเสร็จ' => 'success',
+                                        'ยกเลิก' => 'danger'
+                                    ];
+                                    $maintenance_status = $equipment['maintenance_status'];
+                                    $maintenance_class = $maintenance_status_badge[$maintenance_status] ?? 'secondary';
+                                    ?>
+                                    <span class="badge bg-<?php echo $maintenance_class; ?>">
+                                        <?php echo $maintenance_status ?: 'ไม่มี'; ?>
                                     </span>
                                 </td>
                                 <td><?php echo $equipment['purchase_date']; ?></td>
@@ -476,7 +461,7 @@ include 'includes/sidebar.php';
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="8" class="text-center py-4">
+                                <td colspan="9" class="text-center py-4">
                                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                     <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์</h5>
                                     <?php if (!empty($search) || !empty($filter_department) || !empty($filter_status)): ?>
@@ -650,14 +635,9 @@ include 'includes/sidebar.php';
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">สถานะ *</label>
                                     <select class="form-control" name="status" id="status" required>
-                                        <option value="ใหม่">ใหม่</option>
-                                        <option value="ใช้งานปกติ" selected>ใช้งานปกติ</option>
-                                        <option value="ชำรุด">ชำรุด</option>
-                                        <option value="รอซ่อม">รอซ่อม</option>
-                                        <option value="กำลังซ่อม">กำลังซ่อม</option>
-                                        <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
-                                        <option value="ส่งคืนแล้ว">ส่งคืนแล้ว</option>
-                                        <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
+                                        <option value="อุปกรณ์ใหม่">อุปกรณ์ใหม่</option>
+                                        <option value="อุปกรณ์เดิม" selected>อุปกรณ์เดิม</option>
+                                        <!-- ไม่แสดงสถานะ -ซ่อมเสร็จ ใน dropdown -->
                                     </select>
                                 </div>
                             </div>
@@ -760,8 +740,12 @@ include 'includes/sidebar.php';
                                     <td id="viewResponsible">-</td>
                                 </tr>
                                 <tr>
-                                    <th class="bg-light">สถานะ</th>
+                                    <th class="bg-light">สถานะอุปกรณ์</th>
                                     <td id="viewStatus">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">สถานะซ่อมล่าสุด</th>
+                                    <td id="viewMaintenanceStatus">-</td>
                                 </tr>
                                 <tr>
                                     <th class="bg-light">รายละเอียดคุณสมบัติ</th>
@@ -805,7 +789,7 @@ function editEquipment(equipment) {
     document.getElementById('purchase_price').value = equipment.purchase_price || '';
     document.getElementById('department_id').value = equipment.department_id || '';
     document.getElementById('responsible_person').value = equipment.responsible_person || '';
-    document.getElementById('status').value = equipment.status || 'ใช้งานปกติ';
+    document.getElementById('status').value = equipment.status || 'อุปกรณ์ใหม่';
     document.getElementById('specifications').value = equipment.specifications || '';
     document.getElementById('current_image').value = equipment.image || '';
     
@@ -843,17 +827,22 @@ function viewEquipment(equipment) {
     document.getElementById('viewSpecifications').textContent = equipment.specifications || '-';
     
     const statusBadges = {
-        'ใหม่': 'success',
-        'ใช้งานปกติ': 'primary',
-        'ชำรุด': 'warning',
-        'รอซ่อม': 'info',
-        'กำลังซ่อม': 'warning',
-        'ซ่อมเสร็จแล้ว': 'success',
-        'ส่งคืนแล้ว': 'primary',
-        'จำหน่ายแล้ว': 'danger'
+        'อุปกรณ์ใหม่': 'success',
+        'อุปกรณ์เดิม': 'primary'
     };
     const badgeClass = statusBadges[equipment.status] || 'secondary';
     document.getElementById('viewStatus').innerHTML = `<span class="badge bg-${badgeClass}">${equipment.status}</span>`;
+    
+    // แสดงสถานะการซ่อม
+    const maintenanceStatus = equipment.maintenance_status || 'ไม่มี';
+    const maintenanceBadges = {
+        'รอซ่อม': 'warning',
+        'กำลังดำเนินการ': 'info',
+        'ซ่อมเสร็จ': 'success',
+        'ยกเลิก': 'danger'
+    };
+    const maintenanceClass = maintenanceBadges[maintenanceStatus] || 'secondary';
+    document.getElementById('viewMaintenanceStatus').innerHTML = `<span class="badge bg-${maintenanceClass}">${maintenanceStatus}</span>`;
     
     if (equipment.image) {
         document.getElementById('viewImage').src = 'uploads/img_equipment/' + equipment.image;

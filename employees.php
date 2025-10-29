@@ -66,8 +66,13 @@ $employees_query = "SELECT e.*, d.name as department_name
     ORDER BY e.first_name, e.last_name";
 $employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Get departments for dropdown
-$departments = $db->query("SELECT * FROM departments ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+// กำหนดข้อมูลแผนกแบบคงที่
+$departments = [
+    ['id' => 1, 'name' => 'แผนกอำนวยการ'],
+    ['id' => 2, 'name' => 'แผนกอนุบาล'],
+    ['id' => 3, 'name' => 'แผนกประถม'],
+    ['id' => 4, 'name' => 'แผนกมัธยม']
+];
 ?>
 
 <?php 

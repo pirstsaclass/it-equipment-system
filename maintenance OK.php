@@ -17,170 +17,123 @@ if (isset($_GET['action'])) {
 
 if ($_POST) {
     if (isset($_POST['add_maintenance'])) {
-        try {
-            $equipment_id = $_POST['equipment_id'];
-            $new_status = $_POST['status'];
-            
-            // Insert maintenance record
-            $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_name, building_name, floor_name, room_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->execute([
-                $equipment_id,
-                $_POST['report_date'],
-                $_POST['problem_description'],
-                $_POST['reported_by'],
-                $_POST['assigned_technician'],
-                $_POST['cost'],
-                $new_status,
-                $_POST['solution_description'],
-                $_POST['completed_date'],
-                $_POST['school_name'],
-                $_POST['building_name'],
-                $_POST['floor_name'],
-                $_POST['room_name']
-            ]);
-            
-            // Update equipment status based on maintenance status
-            if ($new_status == 'ซ่อมเสร็จ') {
-                // ดึงสถานะปัจจุบันของอุปกรณ์
-                $current_status_stmt = $db->prepare("SELECT status FROM equipment WHERE id = ?");
-                $current_status_stmt->execute([$equipment_id]);
-                $current_equipment_status = $current_status_stmt->fetchColumn();
-                
-                // กำหนดสถานะใหม่ตามสถานะปัจจุบัน
-                if ($current_equipment_status == 'อุปกรณ์ใหม่') {
-                    $equipment_status = 'อุปกรณ์ใหม่-ซ่อมเสร็จ';
-                } else {
-                    $equipment_status = 'อุปกรณ์เดิม-ซ่อมเสร็จ';
-                }
-                
-                $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
-                $update_stmt->execute([$equipment_status, $equipment_id]);
-            } else {
-                // สำหรับสถานะอื่นๆ
-                $equipment_status = '';
-                switch ($new_status) {
-                    case 'รอซ่อม':
-                        $equipment_status = 'รอซ่อม';
-                        break;
-                    case 'กำลังดำเนินการ':
-                        $equipment_status = 'กำลังซ่อม';
-                        break;
-                    case 'ยกเลิก':
-                        // เมื่อยกเลิก ให้กลับไปเป็นสถานะเดิมก่อนซ่อม
-                        $current_status_stmt = $db->prepare("SELECT status FROM equipment WHERE id = ?");
-                        $current_status_stmt->execute([$equipment_id]);
-                        $current_equipment_status = $current_status_stmt->fetchColumn();
-                        
-                        // ถ้าสถานะปัจจุบันเป็นสถานะซ่อม ให้กลับไปเป็นอุปกรณ์ใหม่/เดิม
-                        if (strpos($current_equipment_status, 'อุปกรณ์เดิม') !== false) {
-                            $equipment_status = 'อุปกรณ์เดิม';
-                        } else {
-                            $equipment_status = 'อุปกรณ์ใหม่';
-                        }
-                        break;
-                }
-                
-                if ($equipment_status) {
-                    $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
-                    $update_stmt->execute([$equipment_status, $equipment_id]);
-                }
-            }
-            
-            $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมและอัปเดตสถานะครุภัณฑ์เรียบร้อยแล้ว";
-            header("Location: maintenance.php");
-            exit();
-            
-        } catch (PDOException $e) {
-            $_SESSION['error'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล: " . $e->getMessage();
-            header("Location: maintenance.php");
-            exit();
+    try {
+        $equipment_id = $_POST['equipment_id'];
+        $new_status = $_POST['status'];
+        
+        // Insert maintenance record
+        $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, status, solution_description, completed_date, school_name, building_name, floor_name, room_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([
+            $equipment_id,
+            $_POST['report_date'],
+            $_POST['problem_description'],
+            $_POST['reported_by'],
+            $_POST['assigned_technician'],
+            $_POST['cost'],
+            $new_status,
+            $_POST['solution_description'],
+            $_POST['completed_date'],
+            $_POST['school_name'],
+            $_POST['building_name'],
+            $_POST['floor_name'],
+            $_POST['room_name']
+        ]);
+        
+        // Update equipment status based on maintenance status
+        $equipment_status = '';
+        switch ($new_status) {
+            case 'รอซ่อม':
+                $equipment_status = 'รอซ่อม';
+                break;
+            case 'กำลังดำเนินการ':
+                $equipment_status = 'กำลังซ่อม';
+                break;
+            case 'ซ่อมเสร็จ':
+                $equipment_status = 'ใช้งานปกติ';
+                break;
+            case 'ยกเลิก':
+                $equipment_status = 'ใช้งานปกติ';
+                break;
         }
+        
+        if ($equipment_status) {
+            $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
+            $update_stmt->execute([$equipment_status, $equipment_id]);
+        }
+        
+        $_SESSION['success'] = "เพิ่มข้อมูลการซ่อมและอัปเดตสถานะครุภัณฑ์เรียบร้อยแล้ว";
+        header("Location: maintenance.php");
+        exit();
+        
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล: " . $e->getMessage();
+        header("Location: maintenance.php");
+        exit();
     }
+}
     
     if (isset($_POST['edit_maintenance'])) {
-        try {
-            $equipment_id = $_POST['equipment_id'];
-            $new_status = $_POST['status'];
-            
-            // Get old status before update
-            $old_status_stmt = $db->prepare("SELECT status FROM maintenance WHERE id = ?");
-            $old_status_stmt->execute([$_POST['id']]);
-            $old_status = $old_status_stmt->fetchColumn();
-            
-            // Update maintenance record
-            $stmt = $db->prepare("UPDATE maintenance SET report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=?, updated_at=NOW() WHERE id=?");
-            $stmt->execute([
-                $_POST['report_date'],
-                $_POST['problem_description'],
-                $_POST['reported_by'],
-                $_POST['assigned_technician'],
-                $_POST['cost'],
-                $new_status,
-                $_POST['solution_description'],
-                $_POST['completed_date'],
-                $_POST['school_name'],
-                $_POST['building_name'],
-                $_POST['floor_name'],
-                $_POST['room_name'],
-                $_POST['id']
-            ]);
-            
-            // Update equipment status based on maintenance status
-            if ($old_status != $new_status) {
-                if ($new_status == 'ซ่อมเสร็จ') {
-                    // ดึงสถานะปัจจุบันของอุปกรณ์
-                    $current_status_stmt = $db->prepare("SELECT status FROM equipment WHERE id = ?");
-                    $current_status_stmt->execute([$equipment_id]);
-                    $current_equipment_status = $current_status_stmt->fetchColumn();
-                    
-                    // กำหนดสถานะใหม่ตามสถานะปัจจุบัน
-                    if (strpos($current_equipment_status, 'อุปกรณ์ใหม่') !== false) {
-                        $equipment_status = 'อุปกรณ์ใหม่-ซ่อมเสร็จ';
-                    } else {
-                        $equipment_status = 'อุปกรณ์เดิม-ซ่อมเสร็จ';
-                    }
-                } else {
-                    // สำหรับสถานะอื่นๆ
-                    $equipment_status = '';
-                    switch ($new_status) {
-                        case 'รอซ่อม':
-                            $equipment_status = 'รอซ่อม';
-                            break;
-                        case 'กำลังดำเนินการ':
-                            $equipment_status = 'กำลังซ่อม';
-                            break;
-                        case 'ยกเลิก':
-                            // เมื่อยกเลิก ให้กลับไปเป็นสถานะเดิมก่อนซ่อม
-                            $current_status_stmt = $db->prepare("SELECT status FROM equipment WHERE id = ?");
-                            $current_status_stmt->execute([$equipment_id]);
-                            $current_equipment_status = $current_status_stmt->fetchColumn();
-                            
-                            // ถ้าสถานะปัจจุบันเป็นสถานะซ่อม ให้กลับไปเป็นอุปกรณ์ใหม่/เดิม
-                            if (strpos($current_equipment_status, 'อุปกรณ์เดิม') !== false) {
-                                $equipment_status = 'อุปกรณ์เดิม';
-                            } else {
-                                $equipment_status = 'อุปกรณ์ใหม่';
-                            }
-                            break;
-                    }
-                }
-                
-                if ($equipment_status) {
-                    $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
-                    $update_stmt->execute([$equipment_status, $equipment_id]);
-                }
+    try {
+        $equipment_id = $_POST['equipment_id'];
+        $new_status = $_POST['status'];
+        
+        // Get old status before update
+        $old_status_stmt = $db->prepare("SELECT status FROM maintenance WHERE id = ?");
+        $old_status_stmt->execute([$_POST['id']]);
+        $old_status = $old_status_stmt->fetchColumn();
+        
+        // Update maintenance record - ไม่ต้องอัพเดท equipment_id
+        $stmt = $db->prepare("UPDATE maintenance SET report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=?, updated_at=NOW() WHERE id=?");
+        $stmt->execute([
+            $_POST['report_date'],
+            $_POST['problem_description'],
+            $_POST['reported_by'],
+            $_POST['assigned_technician'],
+            $_POST['cost'],
+            $new_status,
+            $_POST['solution_description'],
+            $_POST['completed_date'],
+            $_POST['school_name'],
+            $_POST['building_name'],
+            $_POST['floor_name'],
+            $_POST['room_name'],
+            $_POST['id']
+        ]);
+        
+        // Update equipment status based on maintenance status
+        if ($old_status != $new_status) {
+            $equipment_status = '';
+            switch ($new_status) {
+                case 'รอซ่อม':
+                    $equipment_status = 'รอซ่อม';
+                    break;
+                case 'กำลังดำเนินการ':
+                    $equipment_status = 'กำลังซ่อม';
+                    break;
+                case 'ซ่อมเสร็จ':
+                    $equipment_status = 'ใช้งานปกติ';
+                    break;
+                case 'ยกเลิก':
+                    $equipment_status = 'ใช้งานปกติ';
+                    break;
             }
             
-            $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมและอัปเดตสถานะครุภัณฑ์เรียบร้อยแล้ว";
-            header("Location: maintenance.php");
-            exit();
-            
-        } catch (PDOException $e) {
-            $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัปเดตข้อมูล: " . $e->getMessage();
-            header("Location: maintenance.php");
-            exit();
+            if ($equipment_status) {
+                $update_stmt = $db->prepare("UPDATE equipment SET status = ? WHERE id = ?");
+                $update_stmt->execute([$equipment_status, $equipment_id]);
+            }
         }
+        
+        $_SESSION['success'] = "แก้ไขข้อมูลการซ่อมและอัปเดตสถานะครุภัณฑ์เรียบร้อยแล้ว";
+        header("Location: maintenance.php");
+        exit();
+        
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัปเดตข้อมูล: " . $e->getMessage();
+        header("Location: maintenance.php");
+        exit();
     }
+}
 }
 
 // Get maintenance list with location data
@@ -199,13 +152,6 @@ $equipment_list = $db->query("SELECT e.id, e.code, e.name, e.status, c.name as c
                               LEFT JOIN categories c ON e.category_id = c.id 
                               LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
                               ORDER BY e.code")->fetchAll(PDO::FETCH_ASSOC);
-
-// Get employees for technician dropdown
-$employees_query = "SELECT e.id, e.first_name, e.last_name, d.name as department_name 
-                    FROM employees e 
-                    LEFT JOIN departments d ON e.department_id = d.id 
-                    ORDER BY e.first_name, e.last_name";
-$employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get frequently repaired equipment
 $frequent_repair_query = "
@@ -290,9 +236,9 @@ include 'includes/sidebar.php';
                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th width="110">รหัสครุภัณฑ์</th>
+                            <th width="100">รหัสครุภัณฑ์</th>
                             <th width="150">ชื่ออุปกรณ์</th>
-                            <th width="150">สถานที่</th>
+                            <th width="120">สถานที่</th>
                             <th>ปัญหาที่พบ</th>
                             <th width="110">วันที่แจ้งซ่อม</th>
                             <th width="120">ผู้แจ้งซ่อม</th>
@@ -366,21 +312,18 @@ include 'includes/sidebar.php';
                             <td class="text-center">
                                 <?php 
                                 $equip_status_badge = [
-                                    'อุปกรณ์ใหม่' => 'success',
-                                    'อุปกรณ์เดิม' => 'primary',
-                                    'อุปกรณ์ใหม่-ซ่อมเสร็จ' => 'success',
-                                    'อุปกรณ์เดิม-ซ่อมเสร็จ' => 'primary',
-                                    'รอซ่อม' => 'info',
-                                    'กำลังซ่อม' => 'warning',
+                                    'ใหม่' => 'success',
                                     'ใช้งานปกติ' => 'primary',
                                     'ชำรุด' => 'warning',
+                                    'รอซ่อม' => 'info',
+                                    'กำลังซ่อม' => 'warning',
                                     'ซ่อมเสร็จแล้ว' => 'success',
                                     'ส่งคืนแล้ว' => 'primary',
                                     'จำหน่ายแล้ว' => 'danger'
                                 ];
                                 $equip_status_class = $equip_status_badge[$maintenance['equipment_status']] ?? 'secondary';
                                 ?>
-                                <span class="badge bg-<?php echo $equip_status_class; ?>" style="max-width: 120px; white-space: normal; word-wrap: break-word; line-height: 1.2;">
+                                <span class="badge bg-<?php echo $equip_status_class; ?>">
                                     <?php echo $maintenance['equipment_status']; ?>
                                 </span>
                             </td>
@@ -502,17 +445,7 @@ include 'includes/sidebar.php';
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">ผู้ดำเนินการ</label>
-                            <select class="form-control" name="assigned_technician" id="assigned_technician">
-                                <option value="">เลือกผู้ดำเนินการ</option>
-                                <?php foreach($employees_list as $employee): ?>
-                                <option value="<?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?>">
-                                    <?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?>
-                                    <?php if ($employee['department_name']): ?>
-                                        (<?php echo $employee['department_name']; ?>)
-                                    <?php endif; ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <input type="text" class="form-control" name="assigned_technician" id="assigned_technician" placeholder="กรอกชื่อผู้ดำเนินการซ่อม">
                         </div>
                     </div>
                     
@@ -542,6 +475,7 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
+
 // ข้อมูลโรงเรียน ตึก และชั้น
 const schoolData = {
     "โรงเรียนวารีเชียงใหม่": {
@@ -663,9 +597,6 @@ function clearForm() {
     document.getElementById('building_name').disabled = true;
     document.getElementById('floor_name').disabled = true;
     document.getElementById('room_name').disabled = true;
-    
-    // Hide equipment status alert
-    document.getElementById('equipmentStatusAlert').style.display = 'none';
 }
 
 function editMaintenance(maintenance) {
@@ -709,24 +640,6 @@ function editMaintenance(maintenance) {
     
     // Disable equipment selection in edit mode
     document.getElementById('equipment_id').disabled = true;
-    
-    // Show equipment status
-    showEquipmentStatus();
-}
-
-function showEquipmentStatus() {
-    const equipmentSelect = document.getElementById('equipment_id');
-    const selectedOption = equipmentSelect.options[equipmentSelect.selectedIndex];
-    const status = selectedOption.getAttribute('data-status');
-    const alertDiv = document.getElementById('equipmentStatusAlert');
-    const statusText = document.getElementById('equipmentStatusText');
-    
-    if (status) {
-        statusText.textContent = 'สถานะปัจจุบันของครุภัณฑ์: ' + status;
-        alertDiv.style.display = 'block';
-    } else {
-        alertDiv.style.display = 'none';
-    }
 }
 
 $(document).ready(function() {
@@ -738,7 +651,7 @@ $(document).ready(function() {
         pageLength: 25,
         responsive: true,
         columnDefs: [
-            { orderable: false, targets: [9] } // Disable sorting for action column
+            { orderable: false, targets: [8] } // Disable sorting for action column
         ]
     });
 });
