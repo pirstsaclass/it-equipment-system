@@ -64,7 +64,7 @@ if ($_POST) {
         }
         
         if (!isset($_SESSION['error'])) {
-            $stmt = $db->prepare("INSERT INTO equipment (code, name, category_id, category_item_id, brand, model, serial_number, purchase_date, purchase_price, department_id, responsible_person, status, specifications, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO equipment (code, name, category_id, category_item_id, brand, model, serial_number, purchase_date, purchase_price, department_id, responsible_person, equipment_status, specifications, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $_POST['code'],
                 $_POST['name'],
@@ -77,7 +77,7 @@ if ($_POST) {
                 $_POST['purchase_price'],
                 $_POST['department_id'],
                 $_POST['responsible_person'],
-                $_POST['status'],
+                $_POST['equipment_status'],
                 $_POST['specifications'],
                 $image_filename
             ]);
@@ -90,11 +90,11 @@ if ($_POST) {
     if (isset($_POST['edit_equipment'])) {
         try {
             // Get old status before update
-            $old_status_stmt = $db->prepare("SELECT status FROM equipment WHERE id = ?");
+            $old_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE id = ?");
             $old_status_stmt->execute([$_POST['id']]);
             $old_status = $old_status_stmt->fetchColumn();
             
-            $new_status = $_POST['status'];
+            $new_status = $_POST['equipment_status'];
             
             // Handle image upload
             $image_filename = $_POST['current_image'];
@@ -141,7 +141,7 @@ if ($_POST) {
             
             if (!isset($_SESSION['error'])) {
                 // Update equipment
-                $stmt = $db->prepare("UPDATE equipment SET code=?, name=?, category_id=?, category_item_id=?, brand=?, model=?, serial_number=?, purchase_date=?, purchase_price=?, department_id=?, responsible_person=?, status=?, specifications=?, image=? WHERE id=?");
+                $stmt = $db->prepare("UPDATE equipment SET code=?, name=?, category_id=?, category_item_id=?, brand=?, model=?, serial_number=?, purchase_date=?, purchase_price=?, department_id=?, responsible_person=?, equipment_status=?, specifications=?, image=? WHERE id=?");
                 $stmt->execute([
                     $_POST['code'],
                     $_POST['name'],
@@ -194,7 +194,7 @@ if (!empty($filter_department)) {
 }
 
 if (!empty($filter_status)) {
-    $where_conditions[] = "e.status = ?";
+    $where_conditions[] = "e.equipment_status = ?";
     $params[] = $filter_status;
 }
 
@@ -220,7 +220,7 @@ $offset = ($current_page - 1) * $records_per_page;
 
 // Get equipment list with pagination and search - แก้ไข query
 $equipment_query = "SELECT e.*, c.name as category_name, ci.name as item_name, d.name as department_name,
-                           (SELECT m.status FROM maintenance m 
+                           (SELECT m.repair_status FROM maintenance m 
                             WHERE m.equipment_id = e.id 
                             ORDER BY m.created_at DESC 
                             LIMIT 1) as maintenance_status
@@ -424,8 +424,8 @@ include 'includes/sidebar.php';
                                         'จำหน่ายแล้ว' => 'danger'
                                     ];
                                     ?>
-                                    <span class="badge bg-<?php echo $status_badge[$equipment['status']] ?? 'secondary'; ?>" style="max-width: 120px; white-space: normal; word-wrap: break-word; line-height: 1.2;">
-                                        <?php echo $equipment['status']; ?>
+                                    <span class="badge bg-<?php echo $status_badge[$equipment['equipment_status']] ?? 'secondary'; ?>" style="max-width: 120px; white-space: normal; word-wrap: break-word; line-height: 1.2;">
+                                        <?php echo $equipment['equipment_status']; ?>
                                     </span>
                                 </td>
                                 <td>
@@ -634,7 +634,7 @@ include 'includes/sidebar.php';
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">สถานะ *</label>
-                                    <select class="form-control" name="status" id="status" required>
+                                    <select class="form-control" name="equipment_status" id="equipment_status" required>
                                         <option value="อุปกรณ์ใหม่">อุปกรณ์ใหม่</option>
                                         <option value="อุปกรณ์เดิม" selected>อุปกรณ์เดิม</option>
                                         <!-- ไม่แสดงสถานะ -ซ่อมเสร็จ ใน dropdown -->
@@ -789,7 +789,7 @@ function editEquipment(equipment) {
     document.getElementById('purchase_price').value = equipment.purchase_price || '';
     document.getElementById('department_id').value = equipment.department_id || '';
     document.getElementById('responsible_person').value = equipment.responsible_person || '';
-    document.getElementById('status').value = equipment.status || 'อุปกรณ์ใหม่';
+    document.getElementById('equipment_status').value = equipment.equipment_status || 'อุปกรณ์ใหม่';
     document.getElementById('specifications').value = equipment.specifications || '';
     document.getElementById('current_image').value = equipment.image || '';
     
@@ -830,8 +830,8 @@ function viewEquipment(equipment) {
         'อุปกรณ์ใหม่': 'success',
         'อุปกรณ์เดิม': 'primary'
     };
-    const badgeClass = statusBadges[equipment.status] || 'secondary';
-    document.getElementById('viewStatus').innerHTML = `<span class="badge bg-${badgeClass}">${equipment.status}</span>`;
+    const badgeClass = statusBadges[equipment.equipment_status] || 'secondary';
+    document.getElementById('viewStatus').innerHTML = `<span class="badge bg-${badgeClass}">${equipment.equipment_status}</span>`;
     
     // แสดงสถานะการซ่อม
     const maintenanceStatus = equipment.maintenance_status || 'ไม่มี';

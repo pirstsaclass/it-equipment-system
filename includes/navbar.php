@@ -12,7 +12,7 @@
                         <i class="fas fa-bell fa-fw"></i>
                         <?php
                         // Count pending maintenance
-                        $pending_query = "SELECT COUNT(*) as count FROM maintenance WHERE status = 'รอซ่อม'";
+                        $pending_query = "SELECT COUNT(*) as count FROM maintenance WHERE repair_status = 'รอซ่อม'";
                         $pending_count = $db->query($pending_query)->fetch(PDO::FETCH_ASSOC)['count'];
                         ?>
                         <?php if ($pending_count > 0): ?>

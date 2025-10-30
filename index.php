@@ -1,13 +1,13 @@
 <?php
 require_once 'includes/header.php';
 
-// สถิติครุภัณฑ์
+// สถิติครุภัณฑ์ - แก้ไข equipment status
 $equipment_stats_query = "SELECT 
     COUNT(*) as total,
-    SUM(CASE WHEN status = 'ใหม่' THEN 1 ELSE 0 END) as new,
-    SUM(CASE WHEN status = 'ชำรุด' THEN 1 ELSE 0 END) as damaged,
-    SUM(CASE WHEN status = 'รอซ่อม' THEN 1 ELSE 0 END) as repair,
-    SUM(CASE WHEN status = 'จำหน่ายแล้ว' THEN 1 ELSE 0 END) as disposed
+    SUM(CASE WHEN equipment_status = 'ใหม่' THEN 1 ELSE 0 END) as new,
+    SUM(CASE WHEN equipment_status = 'ชำรุด' THEN 1 ELSE 0 END) as damaged,
+    SUM(CASE WHEN equipment_status = 'รอซ่อม' THEN 1 ELSE 0 END) as repair,
+    SUM(CASE WHEN equipment_status = 'จำหน่ายแล้ว' THEN 1 ELSE 0 END) as disposed
     FROM equipment";
 $equipment_stats = $db->query($equipment_stats_query)->fetch(PDO::FETCH_ASSOC);
 
@@ -18,13 +18,13 @@ $equipment_by_category_query = "SELECT c.name, COUNT(e.id) as count
     GROUP BY c.id, c.name";
 $equipment_by_category = $db->query($equipment_by_category_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// ครุภัณฑ์แยกตามสถานะ
-$equipment_by_status_query = "SELECT status, COUNT(*) as count 
+// ครุภัณฑ์แยกตามสถานะ - แก้ไข equipment status
+$equipment_by_status_query = "SELECT equipment_status, COUNT(*) as count 
     FROM equipment 
-    GROUP BY status";
+    GROUP BY equipment_status";
 $equipment_by_status = $db->query($equipment_by_status_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// การซ่อมบำรุงล่าสุด
+// การซ่อมบำรุงล่าสุด - แก้ไข maintenance status
 $maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, c.name as category_name, ci.name as item_name
     FROM maintenance m 
     JOIN equipment e ON m.equipment_id = e.id 
@@ -34,7 +34,7 @@ $maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, c.name as ca
     LIMIT 5";
 $maintenance_list = $db->query($maintenance_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// อุปกรณ์ที่ซ่อมบ่อย - แก้ไข SQL syntax
+// อุปกรณ์ที่ซ่อมบ่อย
 $frequent_repair_query = "
     SELECT e.code, e.name, c.name as category_name, ci.name as item_name, COUNT(m.id) as repair_count 
     FROM equipment e 
@@ -48,8 +48,6 @@ $frequent_repair_query = "
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<!-- ส่วนที่เหลือของ index.php เหมือนเดิม -->
-<!-- ... -->
 <?php 
 // Include sidebar
 include 'includes/sidebar.php';
@@ -207,6 +205,7 @@ include 'includes/sidebar.php';
                                     <td><?php echo $maintenance['assigned_technician'] ?: 'ยังไม่ได้มอบหมาย'; ?></td>
                                     <td>
                                         <?php 
+                                        // แก้ไข maintenance status
                                         $status_badge = [
                                             'รอซ่อม' => 'warning',
                                             'กำลังดำเนินการ' => 'info',
@@ -214,8 +213,8 @@ include 'includes/sidebar.php';
                                             'ยกเลิก' => 'danger'
                                         ];
                                         ?>
-                                        <span class="badge bg-<?php echo $status_badge[$maintenance['status']]; ?>">
-                                            <?php echo $maintenance['status']; ?>
+                                        <span class="badge bg-<?php echo $status_badge[$maintenance['repair_status']]; ?>">
+                                            <?php echo $maintenance['repair_status']; ?>
                                         </span>
                                     </td>
                                     <td>
@@ -295,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Equipment Status Chart
+    // Equipment Status Chart - แก้ไข labels
     const statusCtx = document.getElementById('equipmentStatusChart').getContext('2d');
     const statusChart = new Chart(statusCtx, {
         type: 'doughnut',
@@ -303,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
             labels: [<?php 
                 $labels = [];
                 foreach($equipment_by_status as $status) {
-                    $labels[] = $status['status'];
+                    $labels[] = $status['equipment_status'];
                 }
                 echo '"' . implode('","', $labels) . '"'; 
             ?>],

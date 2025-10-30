@@ -41,6 +41,12 @@
                         ระบบซ่อมบำรุง
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'classroom_equipment.php' ? 'active' : ''; ?>" href="classroom_equipment.php">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                        <span>อุปกรณ์ในห้องเรียน</span>
+                    </a>
+                </li>                
                 
                 <!-- ข้อมูลองค์กร -->
                 <li class="nav-item mt-2">

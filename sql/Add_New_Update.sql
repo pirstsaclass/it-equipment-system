@@ -43,6 +43,20 @@ CREATE TABLE maintenance (
     FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
 );
 
+
+CREATE TABLE classroom_equipment (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    room_number VARCHAR(20) NOT NULL,
+    equipment_name VARCHAR(255) NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    equipment_condition VARCHAR(50) DEFAULT 'ดี',  -- เปลี่ยนจาก condition เป็น equipment_condition
+    description TEXT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
 ALTER TABLE equipment 
 MODIFY COLUMN status ENUM('อุปกรณ์ใหม่', 'อุปกรณ์เดิม') 
 NOT NULL DEFAULT 'อุปกรณ์ใหม่';
