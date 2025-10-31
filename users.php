@@ -11,7 +11,7 @@ if (isset($_GET['action'])) {
         if ($id == $_SESSION['user_id']) {
             $_SESSION['error'] = "ไม่สามารถลบบัญชีของตัวเองได้";
         } else {
-            $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
+            $stmt = $db->prepare("DELETE FROM users WHERE user_id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลผู้ใช้เรียบร้อยแล้ว";
         }
@@ -20,7 +20,8 @@ if (isset($_GET['action'])) {
     }
     
     if ($action == 'toggle_active' && $id) {
-        $stmt = $db->prepare("UPDATE users SET is_active = NOT is_active WHERE id = ?");
+        // Note: users table doesn't have is_active field, using role instead
+        $stmt = $db->prepare("UPDATE users SET role = CASE WHEN role = 'inactive' THEN 'user' ELSE 'inactive' END WHERE user_id = ?");
         $stmt->execute([$id]);
         $_SESSION['success'] = "อัพเดทสถานะผู้ใช้เรียบร้อยแล้ว";
         header("Location: users.php");
@@ -39,13 +40,13 @@ if ($_POST) {
             $_SESSION['error'] = "ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว";
         } else {
             $hashed_password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $db->prepare("INSERT INTO users (username, password, employee_id, role, is_active) VALUES (?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO users (username, password_hash, full_name, email_address, role) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([
                 $_POST['username'],
                 $hashed_password,
-                $_POST['employee_id'],
-                $_POST['role'],
-                isset($_POST['is_active']) ? 1 : 0
+                $_POST['full_name'],
+                $_POST['email_address'],
+                $_POST['role']
             ]);
             $_SESSION['success'] = "เพิ่มข้อมูลผู้ใช้เรียบร้อยแล้ว";
         }
@@ -56,26 +57,26 @@ if ($_POST) {
     if (isset($_POST['edit_user'])) {
         $update_data = [
             $_POST['username'],
-            $_POST['employee_id'],
+            $_POST['full_name'],
+            $_POST['email_address'],
             $_POST['role'],
-            isset($_POST['is_active']) ? 1 : 0,
             $_POST['id']
         ];
         
         // Update password if provided
         if (!empty($_POST['password'])) {
             $hashed_password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE users SET username=?, password=?, employee_id=?, role=?, is_active=? WHERE id=?");
+            $stmt = $db->prepare("UPDATE users SET username=?, password_hash=?, full_name=?, email_address=?, role=? WHERE user_id=?");
             $update_data = [
                 $_POST['username'],
                 $hashed_password,
-                $_POST['employee_id'],
+                $_POST['full_name'],
+                $_POST['email_address'],
                 $_POST['role'],
-                isset($_POST['is_active']) ? 1 : 0,
                 $_POST['id']
             ];
         } else {
-            $stmt = $db->prepare("UPDATE users SET username=?, employee_id=?, role=?, is_active=? WHERE id=?");
+            $stmt = $db->prepare("UPDATE users SET username=?, full_name=?, email_address=?, role=? WHERE user_id=?");
         }
         
         $stmt->execute($update_data);
@@ -85,14 +86,13 @@ if ($_POST) {
     }
 }
 
-// Get users list
-$users_query = "SELECT u.*, e.first_name, e.last_name, e.employee_code 
+// Get users list - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูล
+$users_query = "SELECT u.* 
     FROM users u 
-    LEFT JOIN employees e ON u.employee_id = e.id 
     ORDER BY u.username";
 $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Get employees for dropdown
+// Get employees for dropdown (optional - if you want to link users to employees)
 $employees = $db->query("SELECT * FROM employees ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -135,10 +135,10 @@ include 'includes/sidebar.php';
                     <thead>
                         <tr>
                             <th>ชื่อผู้ใช้</th>
-                            <th>พนักงาน</th>
+                            <th>ชื่อ-นามสกุล</th>
+                            <th>อีเมล</th>
                             <th>สิทธิ์การใช้งาน</th>
-                            <th>สถานะ</th>
-                            <th>เข้าสู่ระบบล่าสุด</th>
+                            <th>วันที่สร้าง</th>
                             <th>จัดการ</th>
                         </tr>
                     </thead>
@@ -146,36 +146,36 @@ include 'includes/sidebar.php';
                         <?php foreach($users_list as $user): ?>
                         <tr>
                             <td><?php echo $user['username']; ?></td>
+                            <td><?php echo $user['full_name']; ?></td>
+                            <td><?php echo $user['email']; ?></td>
                             <td>
-                                <?php if ($user['first_name']): ?>
-                                    <?php echo $user['first_name'] . ' ' . $user['last_name'] . ' (' . $user['employee_code'] . ')'; ?>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <span class="badge bg-<?php echo $user['role'] == 'admin' ? 'danger' : ($user['role'] == 'user' ? 'primary' : 'secondary'); ?>">
-                                    <?php echo $user['role']; ?>
+                                <?php 
+                                $role_badge = [
+                                    'admin' => 'danger',
+                                    'user' => 'primary',
+                                    'technician' => 'warning'
+                                ];
+                                $current_role = $user['role'];
+                                $badge_color = isset($role_badge[$current_role]) ? $role_badge[$current_role] : 'secondary';
+                                ?>
+                                <span class="badge bg-<?php echo $badge_color; ?>">
+                                    <?php 
+                                    $role_names = [
+                                        'admin' => 'ผู้ดูแลระบบ',
+                                        'user' => 'ผู้ใช้งาน',
+                                        'technician' => 'ช่างซ่อม'
+                                    ];
+                                    echo isset($role_names[$current_role]) ? $role_names[$current_role] : $current_role;
+                                    ?>
                                 </span>
                             </td>
-                            <td>
-                                <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                    <a href="users.php?action=toggle_active&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-<?php echo $user['is_active'] ? 'success' : 'secondary'; ?>">
-                                        <?php echo $user['is_active'] ? 'เปิดใช้งาน' : 'ปิดใช้งาน'; ?>
-                                    </a>
-                                <?php else: ?>
-                                    <span class="badge bg-info">บัญชีปัจจุบัน</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php echo $user['last_login'] ? date('d/m/Y H:i', strtotime($user['last_login'])) : 'ยังไม่เคยเข้าสู่ระบบ'; ?>
-                            </td>
+                            <td><?php echo date('d/m/Y', strtotime($user['created_at'])); ?></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                    <a href="users.php?action=delete&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                <?php if ($user['user_id'] != $_SESSION['user_id']): ?>
+                                    <a href="users.php?action=delete&id=<?php echo $user['user_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 <?php endif; ?>
@@ -213,29 +213,22 @@ include 'includes/sidebar.php';
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">พนักงาน</label>
-                        <select class="form-control" name="employee_id" id="employee_id">
-                            <option value="">ไม่ผูกกับพนักงาน</option>
-                            <?php foreach($employees as $employee): ?>
-                            <option value="<?php echo $employee['id']; ?>">
-                                <?php echo $employee['employee_code'] . ' - ' . $employee['first_name'] . ' ' . $employee['last_name']; ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label class="form-label">ชื่อ-นามสกุล *</label>
+                        <input type="text" class="form-control" name="full_name" id="full_name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">อีเมล</label>
+                        <input type="email" class="form-control" name="email" id="email">
                     </div>
                     
                     <div class="mb-3">
                         <label class="form-label">สิทธิ์การใช้งาน *</label>
                         <select class="form-control" name="role" id="role" required>
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
-                            <option value="viewer">Viewer</option>
+                            <option value="user">ผู้ใช้งาน (User)</option>
+                            <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+                            <option value="technician">ช่างซ่อม (Technician)</option>
                         </select>
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" name="is_active" id="is_active" checked>
-                        <label class="form-check-label" for="is_active">เปิดใช้งานบัญชี</label>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -259,16 +252,15 @@ function clearForm() {
     document.getElementById('password').required = true;
     document.getElementById('passwordLabel').textContent = 'รหัสผ่าน *';
     document.getElementById('passwordHelp').style.display = 'none';
-    document.getElementById('is_active').checked = true;
 }
 
 function editUser(user) {
-    document.getElementById('user_id').value = user.id;
+    document.getElementById('user_id').value = user.user_id;
     document.getElementById('username').value = user.username;
     document.getElementById('password').value = '';
-    document.getElementById('employee_id').value = user.employee_id || '';
+    document.getElementById('full_name').value = user.full_name;
+    document.getElementById('email').value = user.email || '';
     document.getElementById('role').value = user.role;
-    document.getElementById('is_active').checked = user.is_active == 1;
     
     document.getElementById('userModalLabel').textContent = 'แก้ไขข้อมูลผู้ใช้';
     document.getElementById('submitBtn').name = 'edit_user';

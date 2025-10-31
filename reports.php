@@ -23,8 +23,9 @@ if (!empty($end_date)) {
 }
 
 if (!empty($department_id)) {
-    $conditions[] = "e.department_id = ?";
-    $params[] = $department_id;
+    // Note: equipment table doesn't have department_id, using location_school instead
+    $conditions[] = "e.location_school LIKE ?";
+    $params[] = "%" . $department_id . "%";
 }
 
 if (!empty($category_id)) {
@@ -33,7 +34,7 @@ if (!empty($category_id)) {
 }
 
 if (!empty($status)) {
-    $conditions[] = "e.status = ?";
+    $conditions[] = "e.equipment_status = ?";
     $params[] = $status;
 }
 
@@ -42,12 +43,12 @@ if (!empty($conditions)) {
     $where_clause = 'WHERE ' . implode(' AND ', $conditions);
 }
 
-// Get equipment for report
-$report_query = "SELECT e.*, c.name as category_name, ci.name as item_name, d.name as department_name 
+// Get equipment for report - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูล
+$report_query = "SELECT e.*, ec.category_name, es.subcategory_name, d.department_name 
     FROM equipment e 
-    LEFT JOIN categories c ON e.category_id = c.id 
-    LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-    LEFT JOIN departments d ON e.department_id = d.id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+    LEFT JOIN departments d ON e.responsible_person LIKE CONCAT('%', d.department_name, '%')
     $where_clause 
     ORDER BY e.purchase_date DESC";
 $stmt = $db->prepare($report_query);
@@ -55,14 +56,11 @@ $stmt->execute($params);
 $report_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get departments for filter
-$departments = $db->query("SELECT * FROM departments ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$departments = $db->query("SELECT * FROM departments ORDER BY department_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get categories for filter
-$categories = $db->query("SELECT * FROM categories ORDER BY code")->fetchAll(PDO::FETCH_ASSOC);
+$categories = $db->query("SELECT * FROM equipment_categories ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
-<!-- ส่วนที่เหลือของ reports.php เหมือนเดิม แต่เพิ่มแสดง category_name และ item_name ในตาราง -->
-<!-- ... -->
 
 <?php 
 // Include sidebar
@@ -104,8 +102,8 @@ include 'includes/sidebar.php';
                     <select class="form-control" name="department_id">
                         <option value="">ทั้งหมด</option>
                         <?php foreach($departments as $department): ?>
-                        <option value="<?php echo $department['id']; ?>" <?php echo $department_id == $department['id'] ? 'selected' : ''; ?>>
-                            <?php echo $department['name']; ?>
+                        <option value="<?php echo $department['department_name']; ?>" <?php echo $department_id == $department['department_name'] ? 'selected' : ''; ?>>
+                            <?php echo $department['department_name']; ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -115,8 +113,8 @@ include 'includes/sidebar.php';
                     <select class="form-control" name="category_id">
                         <option value="">ทั้งหมด</option>
                         <?php foreach($categories as $category): ?>
-                        <option value="<?php echo $category['id']; ?>" <?php echo $category_id == $category['id'] ? 'selected' : ''; ?>>
-                            <?php echo $category['name']; ?>
+                        <option value="<?php echo $category['category_id']; ?>" <?php echo $category_id == $category['category_id'] ? 'selected' : ''; ?>>
+                            <?php echo $category['category_name']; ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -170,7 +168,7 @@ include 'includes/sidebar.php';
                     <h4>
                         <?php 
                         $new_count = count(array_filter($report_data, function($item) {
-                            return $item['status'] == 'ใหม่';
+                            return $item['equipment_status'] == 'ใหม่';
                         }));
                         echo $new_count;
                         ?>
@@ -185,7 +183,7 @@ include 'includes/sidebar.php';
                     <h4>
                         <?php 
                         $repair_count = count(array_filter($report_data, function($item) {
-                            return $item['status'] == 'รอซ่อม';
+                            return $item['equipment_status'] == 'รอซ่อม';
                         }));
                         echo $repair_count;
                         ?>
@@ -208,6 +206,7 @@ include 'includes/sidebar.php';
                             <th>รหัสครุภัณฑ์</th>
                             <th>ชื่ออุปกรณ์</th>
                             <th>ประเภท</th>
+                            <th>หมวดหมู่ย่อย</th>
                             <th>แผนก</th>
                             <th>ผู้รับผิดชอบ</th>
                             <th>วันที่จัดซื้อ</th>
@@ -218,9 +217,10 @@ include 'includes/sidebar.php';
                     <tbody>
                         <?php foreach($report_data as $item): ?>
                         <tr>
-                            <td><?php echo $item['code']; ?></td>
-                            <td><?php echo $item['name']; ?></td>
+                            <td><?php echo $item['equipment_code']; ?></td>
+                            <td><?php echo $item['equipment_name']; ?></td>
                             <td><?php echo $item['category_name']; ?></td>
+                            <td><?php echo $item['subcategory_name']; ?></td>
                             <td><?php echo $item['department_name']; ?></td>
                             <td><?php echo $item['responsible_person']; ?></td>
                             <td><?php echo $item['purchase_date']; ?></td>
@@ -234,9 +234,11 @@ include 'includes/sidebar.php';
                                     'รอซ่อม' => 'info',
                                     'จำหน่ายแล้ว' => 'danger'
                                 ];
+                                $current_status = $item['equipment_status'];
+                                $badge_color = isset($status_badge[$current_status]) ? $status_badge[$current_status] : 'secondary';
                                 ?>
-                                <span class="badge bg-<?php echo $status_badge[$item['status']]; ?>">
-                                    <?php echo $item['status']; ?>
+                                <span class="badge bg-<?php echo $badge_color; ?>">
+                                    <?php echo $current_status; ?>
                                 </span>
                             </td>
                         </tr>

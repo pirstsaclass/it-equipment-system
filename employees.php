@@ -15,7 +15,7 @@ if (isset($_GET['action'])) {
         if ($used_count > 0) {
             $_SESSION['error'] = "ไม่สามารถลบพนักงานนี้ได้ เนื่องจากมีบัญชีผู้ใช้ที่ใช้งานอยู่";
         } else {
-            $stmt = $db->prepare("DELETE FROM employees WHERE id = ?");
+            $stmt = $db->prepare("DELETE FROM employees WHERE employee_id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลพนักงานเรียบร้อยแล้ว";
         }
@@ -26,7 +26,7 @@ if (isset($_GET['action'])) {
 
 if ($_POST) {
     if (isset($_POST['add_employee'])) {
-        $stmt = $db->prepare("INSERT INTO employees (employee_code, first_name, last_name, department_id, position, phone, email) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $db->prepare("INSERT INTO employees (employee_code, first_name, last_name, department_id, position_name, phone_number, email_address) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['employee_code'],
             $_POST['first_name'],
@@ -42,7 +42,7 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_employee'])) {
-        $stmt = $db->prepare("UPDATE employees SET employee_code=?, first_name=?, last_name=?, department_id=?, position=?, phone=?, email=? WHERE id=?");
+        $stmt = $db->prepare("UPDATE employees SET employee_code=?, first_name=?, last_name=?, department_id=?, position_name=?, phone_number=?, email_address=? WHERE employee_id=?");
         $stmt->execute([
             $_POST['employee_code'],
             $_POST['first_name'],
@@ -59,20 +59,16 @@ if ($_POST) {
     }
 }
 
-// Get employees list
-$employees_query = "SELECT e.*, d.name as department_name 
+// Get employees list - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูล
+$employees_query = "SELECT e.*, d.department_name 
     FROM employees e 
-    LEFT JOIN departments d ON e.department_id = d.id 
+    LEFT JOIN departments d ON e.department_id = d.department_id 
     ORDER BY e.first_name, e.last_name";
 $employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// กำหนดข้อมูลแผนกแบบคงที่
-$departments = [
-    ['id' => 1, 'name' => 'แผนกอำนวยการ'],
-    ['id' => 2, 'name' => 'แผนกอนุบาล'],
-    ['id' => 3, 'name' => 'แผนกประถม'],
-    ['id' => 4, 'name' => 'แผนกมัธยม']
-];
+// Get departments from database
+$departments_query = "SELECT department_id, department_name FROM departments ORDER BY department_name";
+$departments = $db->query($departments_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <?php 
@@ -128,14 +124,14 @@ include 'includes/sidebar.php';
                             <td><?php echo $employee['employee_code']; ?></td>
                             <td><?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?></td>
                             <td><?php echo $employee['department_name']; ?></td>
-                            <td><?php echo $employee['position']; ?></td>
-                            <td><?php echo $employee['phone']; ?></td>
-                            <td><?php echo $employee['email']; ?></td>
+                            <td><?php echo $employee['position_name']; ?></td>
+                            <td><?php echo $employee['phone_number']; ?></td>
+                            <td><?php echo $employee['email_address']; ?></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal" onclick='editEmployee(<?php echo json_encode($employee); ?>)'>
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <a href="employees.php?action=delete&id=<?php echo $employee['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                <a href="employees.php?action=delete&id=<?php echo $employee['employee_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
                             </td>
@@ -170,8 +166,8 @@ include 'includes/sidebar.php';
                             <select class="form-control" name="department_id" id="department_id">
                                 <option value="">เลือกแผนก</option>
                                 <?php foreach($departments as $department): ?>
-                                <option value="<?php echo $department['id']; ?>">
-                                    <?php echo $department['name']; ?>
+                                <option value="<?php echo $department['department_id']; ?>">
+                                    <?php echo $department['department_name']; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -224,14 +220,14 @@ function clearForm() {
 }
 
 function editEmployee(employee) {
-    document.getElementById('employee_id').value = employee.id;
+    document.getElementById('employee_id').value = employee.employee_id;
     document.getElementById('employee_code').value = employee.employee_code;
     document.getElementById('first_name').value = employee.first_name;
     document.getElementById('last_name').value = employee.last_name;
     document.getElementById('department_id').value = employee.department_id || '';
-    document.getElementById('position').value = employee.position || '';
-    document.getElementById('phone').value = employee.phone || '';
-    document.getElementById('email').value = employee.email || '';
+    document.getElementById('position').value = employee.position_name || '';
+    document.getElementById('phone').value = employee.phone_number || '';
+    document.getElementById('email').value = employee.email_address || '';
     
     document.getElementById('employeeModalLabel').textContent = 'แก้ไขข้อมูลพนักงาน';
     document.getElementById('submitBtn').name = 'edit_employee';

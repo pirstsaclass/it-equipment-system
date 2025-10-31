@@ -15,51 +15,44 @@ if (isset($_GET['action'])) {
         if ($used_count > 0) {
             $_SESSION['error'] = "ไม่สามารถลบหมวดหมู่นี้ได้ เนื่องจากมีครุภัณฑ์ที่ใช้งานอยู่";
         } else {
-            // Get category code first
-            $stmt = $db->prepare("SELECT code FROM categories WHERE id = ?");
-            $stmt->execute([$id]);
-            $category = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Delete related subcategories first
+            $delete_subcategories_stmt = $db->prepare("DELETE FROM equipment_subcategories WHERE category_id = ?");
+            $delete_subcategories_stmt->execute([$id]);
             
-            if ($category) {
-                // Delete related categories_items first
-                $delete_items_stmt = $db->prepare("DELETE FROM categories_items WHERE category_code = ?");
-                $delete_items_stmt->execute([$category['code']]);
-                
-                // Then delete category
-                $stmt = $db->prepare("DELETE FROM categories WHERE id = ?");
-                $stmt->execute([$id]);
-                $_SESSION['success'] = "ลบข้อมูลหมวดหมู่และรายการอุปกรณ์เรียบร้อยแล้ว";
-            }
+            // Then delete category
+            $stmt = $db->prepare("DELETE FROM equipment_categories WHERE category_id = ?");
+            $stmt->execute([$id]);
+            $_SESSION['success'] = "ลบข้อมูลหมวดหมู่และรายการย่อยเรียบร้อยแล้ว";
         }
         header("Location: categories.php");
         exit();
     }
     
-    if ($action == 'delete_item' && $id) {
-        // Check if item is used in equipment
-        $check_stmt = $db->prepare("SELECT COUNT(*) as count FROM equipment WHERE category_item_id = ?");
+    if ($action == 'delete_subcategory' && $id) {
+        // Check if subcategory is used in equipment
+        $check_stmt = $db->prepare("SELECT COUNT(*) as count FROM equipment WHERE subcategory_id = ?");
         $check_stmt->execute([$id]);
         $used_count = $check_stmt->fetch(PDO::FETCH_ASSOC)['count'];
         
         if ($used_count > 0) {
-            $_SESSION['error'] = "ไม่สามารถลบรายการนี้ได้ เนื่องจากมีครุภัณฑ์ที่ใช้งานอยู่";
+            $_SESSION['error'] = "ไม่สามารถลบหมวดหมู่ย่อยนี้ได้ เนื่องจากมีครุภัณฑ์ที่ใช้งานอยู่";
         } else {
-            $stmt = $db->prepare("DELETE FROM categories_items WHERE id = ?");
+            $stmt = $db->prepare("DELETE FROM equipment_subcategories WHERE subcategory_id = ?");
             $stmt->execute([$id]);
-            $_SESSION['success'] = "ลบข้อมูลรายการอุปกรณ์เรียบร้อยแล้ว";
+            $_SESSION['success'] = "ลบข้อมูลหมวดหมู่ย่อยเรียบร้อยแล้ว";
         }
-        header("Location: categories.php?category_code=" . ($_GET['category_code'] ?? ''));
+        header("Location: categories.php?category_id=" . ($_GET['category_id'] ?? ''));
         exit();
     }
 }
 
 // Handle Form Submissions
 if ($_POST) {
-    // Add/Edit Category with Items
+    // Add/Edit Category with Subcategories
     if (isset($_POST['save_category'])) {
-        $code = $_POST['code'];
-        $name = $_POST['name'];
-        $items = $_POST['items'] ?? [];
+        $category_name = $_POST['category_name'];
+        $category_description = $_POST['category_description'] ?? '';
+        $subcategories = $_POST['subcategories'] ?? [];
         
         try {
             $db->beginTransaction();
@@ -67,59 +60,45 @@ if ($_POST) {
             if (isset($_POST['category_id']) && !empty($_POST['category_id'])) {
                 // Edit existing category
                 $category_id = $_POST['category_id'];
-                $old_code = $_POST['old_code'];
                 
-                $stmt = $db->prepare("UPDATE categories SET code=?, name=? WHERE id=?");
-                $stmt->execute([$code, $name, $category_id]);
+                $stmt = $db->prepare("UPDATE equipment_categories SET category_name=?, category_description=? WHERE category_id=?");
+                $stmt->execute([$category_name, $category_description, $category_id]);
                 
-                // Update category_code in related items if code changed
-                if ($old_code != $code) {
-                    $update_items_stmt = $db->prepare("UPDATE categories_items SET category_code=? WHERE category_code=?");
-                    $update_items_stmt->execute([$code, $old_code]);
-                }
-                
-                // Update existing items and add new items
-                foreach ($items as $item) {
-                    if (!empty($item['name'])) {
-                        if (isset($item['id']) && !empty($item['id'])) {
-                            // Update existing item
-                            $stmt = $db->prepare("UPDATE categories_items SET name=? WHERE id=? AND category_code=?");
-                            $stmt->execute([$item['name'], $item['id'], $code]);
+                // Update existing subcategories and add new subcategories
+                foreach ($subcategories as $subcategory) {
+                    if (!empty($subcategory['name'])) {
+                        if (isset($subcategory['id']) && !empty($subcategory['id'])) {
+                            // Update existing subcategory
+                            $stmt = $db->prepare("UPDATE equipment_subcategories SET subcategory_name=?, subcategory_description=? WHERE subcategory_id=? AND category_id=?");
+                            $stmt->execute([$subcategory['name'], $subcategory['description'] ?? '', $subcategory['id'], $category_id]);
                         } else {
-                            // Add new item
-                            $stmt = $db->prepare("INSERT INTO categories_items (category_code, name) VALUES (?, ?)");
-                            $stmt->execute([$code, $item['name']]);
+                            // Add new subcategory
+                            $stmt = $db->prepare("INSERT INTO equipment_subcategories (category_id, subcategory_name, subcategory_description) VALUES (?, ?, ?)");
+                            $stmt->execute([$category_id, $subcategory['name'], $subcategory['description'] ?? '']);
                         }
                     }
                 }
                 
-                $_SESSION['success'] = "แก้ไขข้อมูลหมวดหมู่และรายการอุปกรณ์เรียบร้อยแล้ว";
+                $_SESSION['success'] = "แก้ไขข้อมูลหมวดหมู่และหมวดหมู่ย่อยเรียบร้อยแล้ว";
             } else {
                 // Add new category
-                // Generate code if not provided
-                if (empty($code)) {
-                    $max_code_stmt = $db->query("SELECT MAX(CAST(code AS UNSIGNED)) as max_code FROM categories WHERE code REGEXP '^[0-9]+$'");
-                    $max_code = $max_code_stmt->fetch(PDO::FETCH_ASSOC)['max_code'] ?: 0;
-                    $code = str_pad($max_code + 1, 2, '0', STR_PAD_LEFT);
-                }
-                
-                $stmt = $db->prepare("INSERT INTO categories (code, name) VALUES (?, ?)");
-                $stmt->execute([$code, $name]);
+                $stmt = $db->prepare("INSERT INTO equipment_categories (category_name, category_description) VALUES (?, ?)");
+                $stmt->execute([$category_name, $category_description]);
                 $category_id = $db->lastInsertId();
                 
-                // Add items
-                foreach ($items as $item) {
-                    if (!empty($item['name'])) {
-                        $stmt = $db->prepare("INSERT INTO categories_items (category_code, name) VALUES (?, ?)");
-                        $stmt->execute([$code, $item['name']]);
+                // Add subcategories
+                foreach ($subcategories as $subcategory) {
+                    if (!empty($subcategory['name'])) {
+                        $stmt = $db->prepare("INSERT INTO equipment_subcategories (category_id, subcategory_name, subcategory_description) VALUES (?, ?, ?)");
+                        $stmt->execute([$category_id, $subcategory['name'], $subcategory['description'] ?? '']);
                     }
                 }
                 
-                $_SESSION['success'] = "เพิ่มข้อมูลหมวดหมู่และรายการอุปกรณ์เรียบร้อยแล้ว";
+                $_SESSION['success'] = "เพิ่มข้อมูลหมวดหมู่และหมวดหมู่ย่อยเรียบร้อยแล้ว";
             }
             
             $db->commit();
-            header("Location: categories.php?category_code=" . $code);
+            header("Location: categories.php?category_id=" . $category_id);
             exit();
             
         } catch (Exception $e) {
@@ -131,36 +110,36 @@ if ($_POST) {
     }
 }
 
-// Get categories list with item counts
+// Get categories list with subcategory counts
 $categories_query = "
-    SELECT c.*, COUNT(ci.id) as item_count 
-    FROM categories c 
-    LEFT JOIN categories_items ci ON c.code = ci.category_code AND ci.is_active = TRUE
-    GROUP BY c.id 
-    ORDER BY c.code";
+    SELECT ec.*, COUNT(es.subcategory_id) as subcategory_count 
+    FROM equipment_categories ec 
+    LEFT JOIN equipment_subcategories es ON ec.category_id = es.category_id
+    GROUP BY ec.category_id 
+    ORDER BY ec.category_name";
 $categories_list = $db->query($categories_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Get categories_items for selected category
-$selected_category_code = isset($_GET['category_code']) ? $_GET['category_code'] : ($categories_list[0]['code'] ?? null);
+// Get subcategories for selected category
+$selected_category_id = isset($_GET['category_id']) ? $_GET['category_id'] : ($categories_list[0]['category_id'] ?? null);
 $selected_category = null;
-$categories_items = [];
+$subcategories = [];
 
-if ($selected_category_code) {
+if ($selected_category_id) {
     // Get category details
-    $stmt = $db->prepare("SELECT * FROM categories WHERE code = ?");
-    $stmt->execute([$selected_category_code]);
+    $stmt = $db->prepare("SELECT * FROM equipment_categories WHERE category_id = ?");
+    $stmt->execute([$selected_category_id]);
     $selected_category = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Get items for this category
-    $items_query = "
-        SELECT ci.*, c.name as category_name, c.code as category_code
-        FROM categories_items ci 
-        JOIN categories c ON ci.category_code = c.code 
-        WHERE ci.category_code = ? 
-        ORDER BY ci.sort_order, ci.name";
-    $stmt = $db->prepare($items_query);
-    $stmt->execute([$selected_category_code]);
-    $categories_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get subcategories for this category
+    $subcategories_query = "
+        SELECT es.*, ec.category_name
+        FROM equipment_subcategories es 
+        JOIN equipment_categories ec ON es.category_id = ec.category_id 
+        WHERE es.category_id = ? 
+        ORDER BY es.subcategory_name";
+    $stmt = $db->prepare($subcategories_query);
+    $stmt->execute([$selected_category_id]);
+    $subcategories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Check if we're in edit mode
@@ -168,14 +147,14 @@ $edit_mode = isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET[
 $edit_category = null;
 
 if ($edit_mode) {
-    $stmt = $db->prepare("SELECT * FROM categories WHERE id = ?");
+    $stmt = $db->prepare("SELECT * FROM equipment_categories WHERE category_id = ?");
     $stmt->execute([$_GET['id']]);
     $edit_category = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Get items for edit category
-    $items_stmt = $db->prepare("SELECT * FROM categories_items WHERE category_code = ? ORDER BY sort_order, name");
-    $items_stmt->execute([$edit_category['code']]);
-    $categories_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get subcategories for edit category
+    $subcategories_stmt = $db->prepare("SELECT * FROM equipment_subcategories WHERE category_id = ? ORDER BY subcategory_name");
+    $subcategories_stmt->execute([$edit_category['category_id']]);
+    $subcategories = $subcategories_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 
@@ -188,7 +167,7 @@ include 'includes/sidebar.php';
     <?php include 'includes/navbar.php'; ?>
 
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">จัดการหมวดหมู่และรายการอุปกรณ์</h1>
+        <h1 class="h2">จัดการหมวดหมู่และหมวดหมู่ย่อยครุภัณฑ์</h1>
         <div>
             <?php if (!$edit_mode): ?>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#categoryModal">
@@ -217,74 +196,77 @@ include 'includes/sidebar.php';
         <div class="card shadow mb-4">
             <div class="card-header py-3 bg-primary text-white">
                 <h6 class="m-0 font-weight-bold">
-                    <i class="fas fa-edit me-2"></i>แก้ไขหมวดหมู่และรายการอุปกรณ์
+                    <i class="fas fa-edit me-2"></i>แก้ไขหมวดหมู่และหมวดหมู่ย่อย
                 </h6>
             </div>
             <div class="card-body">
                 <form method="POST" id="categoryForm">
-                    <input type="hidden" name="category_id" value="<?php echo $edit_category['id']; ?>">
-                    <input type="hidden" name="old_code" value="<?php echo $edit_category['code']; ?>">
+                    <input type="hidden" name="category_id" value="<?php echo $edit_category['category_id']; ?>">
                     
                     <div class="row mb-4">
-                        <div class="col-md-2">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">รหัสหมวดหมู่ *</label>
-                                <input type="text" class="form-control" name="code" 
-                                       value="<?php echo $edit_category['code']; ?>" required
-                                       placeholder="เช่น 01, 02" maxlength="2" pattern="[0-9]{2}">
-                                <div class="form-text">รหัสประจำหมวดหมู่ (2 หลัก)</div>
-                            </div>
-                        </div>
-                        <div class="col-md-10">
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">ชื่อหมวดหมู่ *</label>
-                                <input type="text" class="form-control" name="name" 
-                                       value="<?php echo $edit_category['name']; ?>" required
+                                <input type="text" class="form-control" name="category_name" 
+                                       value="<?php echo $edit_category['category_name']; ?>" required
                                        placeholder="เช่น อุปกรณ์คอมพิวเตอร์">
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">คำอธิบายหมวดหมู่</label>
+                                <textarea class="form-control" name="category_description" rows="2"
+                                       placeholder="รายละเอียดเพิ่มเติมเกี่ยวกับหมวดหมู่"><?php echo $edit_category['category_description']; ?></textarea>
                             </div>
                         </div>
                     </div>
 
-                    <!-- รายการอุปกรณ์ -->
+                    <!-- รายการหมวดหมู่ย่อย -->
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <label class="form-label fw-bold">รายการอุปกรณ์</label>
-                            <button type="button" class="btn btn-success btn-sm" onclick="addItemRow()">
-                                <i class="fas fa-plus me-1"></i> เพิ่มรายการ
+                            <label class="form-label fw-bold">หมวดหมู่ย่อย</label>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addSubcategoryRow()">
+                                <i class="fas fa-plus me-1"></i> เพิ่มหมวดหมู่ย่อย
                             </button>
                         </div>
                         
                         <div class="table-responsive">
-                            <table class="table table-bordered" id="itemsTable">
+                            <table class="table table-bordered" id="subcategoriesTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th width="5%">#</th>
-                                        <th width="90%">ชื่อรายการอุปกรณ์ *</th>
+                                        <th width="45%">ชื่อหมวดหมู่ย่อย *</th>
+                                        <th width="45%">คำอธิบาย</th>
                                         <th width="5%">ลบ</th>
                                     </tr>
                                 </thead>
-                                <tbody id="itemsTableBody">
-                                    <?php if (count($categories_items) > 0): ?>
-                                        <?php foreach($categories_items as $index => $item): ?>
+                                <tbody id="subcategoriesTableBody">
+                                    <?php if (count($subcategories) > 0): ?>
+                                        <?php foreach($subcategories as $index => $subcategory): ?>
                                         <tr>
                                             <td class="text-center"><?php echo $index + 1; ?></td>
                                             <td>
-                                                <input type="hidden" name="items[<?php echo $index; ?>][id]" value="<?php echo $item['id']; ?>">
-                                                <input type="text" class="form-control" name="items[<?php echo $index; ?>][name]" 
-                                                       value="<?php echo $item['name']; ?>" required
-                                                       placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ (PC)">
+                                                <input type="hidden" name="subcategories[<?php echo $index; ?>][id]" value="<?php echo $subcategory['subcategory_id']; ?>">
+                                                <input type="text" class="form-control" name="subcategories[<?php echo $index; ?>][name]" 
+                                                       value="<?php echo $subcategory['subcategory_name']; ?>" required
+                                                       placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ">
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control" name="subcategories[<?php echo $index; ?>][description]" 
+                                                       value="<?php echo $subcategory['subcategory_description']; ?>"
+                                                       placeholder="คำอธิบายหมวดหมู่ย่อย">
                                             </td>
                                             <td class="text-center">
-                                                <button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">
+                                                <button type="button" class="btn btn-danger btn-sm" onclick="removeSubcategoryRow(this)">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
-                                        <tr id="noItemsRow">
-                                            <td colspan="3" class="text-center text-muted py-3">
-                                                <i class="fas fa-info-circle me-2"></i>ยังไม่มีรายการอุปกรณ์
+                                        <tr id="noSubcategoriesRow">
+                                            <td colspan="4" class="text-center text-muted py-3">
+                                                <i class="fas fa-info-circle me-2"></i>ยังไม่มีหมวดหมู่ย่อย
                                             </td>
                                         </tr>
                                     <?php endif; ?>
@@ -316,12 +298,15 @@ include 'includes/sidebar.php';
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
                             <?php foreach($categories_list as $category): ?>
-                            <a href="categories.php?category_code=<?php echo $category['code']; ?>" 
-                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center <?php echo $selected_category_code == $category['code'] ? 'active' : ''; ?>">
+                            <a href="categories.php?category_id=<?php echo $category['category_id']; ?>" 
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center <?php echo $selected_category_id == $category['category_id'] ? 'active' : ''; ?>">
                                 <div>
-                                    <strong class="text-primary"><?php echo $category['code']; ?></strong> - <?php echo $category['name']; ?>
+                                    <strong><?php echo $category['category_name']; ?></strong>
+                                    <?php if ($category['category_description']): ?>
+                                        <br><small class="text-muted"><?php echo $category['category_description']; ?></small>
+                                    <?php endif; ?>
                                 </div>
-                                <span class="badge bg-primary rounded-pill"><?php echo $category['item_count']; ?></span>
+                                <span class="badge bg-primary rounded-pill"><?php echo $category['subcategory_count']; ?></span>
                             </a>
                             <?php endforeach; ?>
                         </div>
@@ -329,43 +314,51 @@ include 'includes/sidebar.php';
                 </div>
             </div>
 
-            <!-- Main Content - Categories Items -->
+            <!-- Main Content - Subcategories -->
             <div class="col-md-8">
-                <?php if ($selected_category_code): ?>
+                <?php if ($selected_category_id): ?>
                     <div class="card shadow mb-4">
                         <div class="card-header py-3 d-flex justify-content-between align-items-center">
                             <h6 class="m-0 font-weight-bold">
                                 <i class="fas fa-list me-2"></i>
-                                รายการอุปกรณ์ - <?php echo $selected_category['code'] ?? '' ?> <?php echo $selected_category['name'] ?? 'ไม่พบหมวดหมู่' ?>
+                                หมวดหมู่ย่อย - <?php echo $selected_category['category_name'] ?? 'ไม่พบหมวดหมู่' ?>
                             </h6>
                             <div>
-                                <a href="categories.php?action=edit&id=<?php echo $selected_category['id']; ?>" class="btn btn-warning btn-sm">
+                                <a href="categories.php?action=edit&id=<?php echo $selected_category['category_id']; ?>" class="btn btn-warning btn-sm">
                                     <i class="fas fa-edit me-1"></i> แก้ไข
                                 </a>
-                                <a href="categories.php?action=delete_category&id=<?php echo $selected_category['id']; ?>" 
-                                   class="btn btn-danger btn-sm" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบหมวดหมู่นี้?')">
+                                <a href="categories.php?action=delete_category&id=<?php echo $selected_category['category_id']; ?>" 
+                                   class="btn btn-danger btn-sm" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบหมวดหมู่นี้? การลบจะทำให้หมวดหมู่ย่อยทั้งหมดถูกลบด้วย')">
                                     <i class="fas fa-trash me-1"></i> ลบ
                                 </a>
                             </div>
                         </div>
                         <div class="card-body">
-                            <?php if (count($categories_items) > 0): ?>
+                            <?php if ($selected_category['category_description']): ?>
+                                <div class="alert alert-info">
+                                    <strong>คำอธิบาย:</strong> <?php echo $selected_category['category_description']; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if (count($subcategories) > 0): ?>
                                 <div class="table-responsive">
                                     <table class="table table-bordered table-hover">
                                         <thead class="table-light">
                                             <tr>
                                                 <th width="10%">#</th>
-                                                <th width="80%">ชื่อรายการอุปกรณ์</th>
-                                                <th width="10%">จัดการ</th>
+                                                <th width="45%">ชื่อหมวดหมู่ย่อย</th>
+                                                <th width="40%">คำอธิบาย</th>
+                                                <th width="5%">จัดการ</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach($categories_items as $index => $item): ?>
+                                            <?php foreach($subcategories as $index => $subcategory): ?>
                                             <tr>
                                                 <td class="text-center fw-bold"><?php echo $index + 1; ?></td>
-                                                <td class="fw-bold"><?php echo $item['name']; ?></td>
+                                                <td class="fw-bold"><?php echo $subcategory['subcategory_name']; ?></td>
+                                                <td><?php echo $subcategory['subcategory_description'] ?: '-'; ?></td>
                                                 <td class="text-center">
-                                                    <a href="categories.php?action=delete_item&id=<?php echo $item['id']; ?>&category_code=<?php echo $selected_category_code; ?>" 
+                                                    <a href="categories.php?action=delete_subcategory&id=<?php echo $subcategory['subcategory_id']; ?>&category_id=<?php echo $selected_category_id; ?>" 
                                                        class="btn btn-danger btn-sm" title="ลบ" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                                         <i class="fas fa-trash"></i>
                                                     </a>
@@ -378,8 +371,8 @@ include 'includes/sidebar.php';
                             <?php else: ?>
                                 <div class="text-center py-5">
                                     <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                                    <h5 class="text-muted">ไม่มีรายการอุปกรณ์ในหมวดหมู่นี้</h5>
-                                    <p class="text-muted">คลิกปุ่ม "แก้ไข" เพื่อเพิ่มรายการอุปกรณ์</p>
+                                    <h5 class="text-muted">ไม่มีหมวดหมู่ย่อยในหมวดหมู่นี้</h5>
+                                    <p class="text-muted">คลิกปุ่ม "แก้ไข" เพื่อเพิ่มหมวดหมู่ย่อย</p>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -387,7 +380,7 @@ include 'includes/sidebar.php';
                 <?php else: ?>
                     <div class="text-center py-5">
                         <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">กรุณาเลือกหมวดหมู่เพื่อดูรายการอุปกรณ์</h5>
+                        <h5 class="text-muted">กรุณาเลือกหมวดหมู่เพื่อดูหมวดหมู่ย่อย</h5>
                         <p class="text-muted">หรือคลิกปุ่ม "เพิ่มหมวดหมู่ใหม่" เพื่อสร้างหมวดหมู่แรก</p>
                     </div>
                 <?php endif; ?>
@@ -409,46 +402,45 @@ include 'includes/sidebar.php';
             <form method="POST" id="newCategoryForm">
                 <div class="modal-body">
                     <div class="row mb-3">
-                        <div class="col-md-3">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">รหัสหมวดหมู่</label>
-                                <input type="text" class="form-control" name="code" 
-                                       placeholder="เช่น 01, 02 (เว้นว่างเพื่อสร้างอัตโนมัติ)" 
-                                       maxlength="2" pattern="[0-9]{2}">
-                                <div class="form-text">รหัสประจำหมวดหมู่ (2 หลัก)</div>
-                            </div>
-                        </div>
-                        <div class="col-md-9">
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">ชื่อหมวดหมู่ *</label>
-                                <input type="text" class="form-control" name="name" required
+                                <input type="text" class="form-control" name="category_name" required
                                        placeholder="เช่น อุปกรณ์คอมพิวเตอร์">
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">คำอธิบายหมวดหมู่</label>
+                                <textarea class="form-control" name="category_description" rows="2"
+                                       placeholder="รายละเอียดเพิ่มเติมเกี่ยวกับหมวดหมู่"></textarea>
                             </div>
                         </div>
                     </div>
 
-                    <!-- รายการอุปกรณ์สำหรับหมวดหมู่ใหม่ -->
+                    <!-- หมวดหมู่ย่อยสำหรับหมวดหมู่ใหม่ -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <label class="form-label fw-bold">รายการอุปกรณ์ (สามารถเพิ่มภายหลังได้)</label>
-                            <button type="button" class="btn btn-success btn-sm" onclick="addNewItemRow()">
-                                <i class="fas fa-plus me-1"></i> เพิ่มรายการ
+                            <label class="form-label fw-bold">หมวดหมู่ย่อย (สามารถเพิ่มภายหลังได้)</label>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addNewSubcategoryRow()">
+                                <i class="fas fa-plus me-1"></i> เพิ่มหมวดหมู่ย่อย
                             </button>
                         </div>
                         
                         <div class="table-responsive">
-                            <table class="table table-bordered" id="newItemsTable">
+                            <table class="table table-bordered" id="newSubcategoriesTable">
                                 <thead class="table-light">
                                     <tr>
                                         <th width="5%">#</th>
-                                        <th width="90%">ชื่อรายการอุปกรณ์</th>
+                                        <th width="45%">ชื่อหมวดหมู่ย่อย</th>
+                                        <th width="45%">คำอธิบาย</th>
                                         <th width="5%">ลบ</th>
                                     </tr>
                                 </thead>
-                                <tbody id="newItemsTableBody">
-                                    <tr id="noNewItemsRow">
-                                        <td colspan="3" class="text-center text-muted py-3">
-                                            <i class="fas fa-info-circle me-2"></i>ยังไม่มีรายการอุปกรณ์
+                                <tbody id="newSubcategoriesTableBody">
+                                    <tr id="noNewSubcategoriesRow">
+                                        <td colspan="4" class="text-center text-muted py-3">
+                                            <i class="fas fa-info-circle me-2"></i>ยังไม่มีหมวดหมู่ย่อย
                                         </td>
                                     </tr>
                                 </tbody>
@@ -468,48 +460,52 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
-let itemCount = <?php echo count($categories_items); ?>;
-let newItemCount = 0;
+let subcategoryCount = <?php echo count($subcategories); ?>;
+let newSubcategoryCount = 0;
 
 // Functions for edit form
-function addItemRow() {
-    const tbody = document.getElementById('itemsTableBody');
-    const noItemsRow = document.getElementById('noItemsRow');
+function addSubcategoryRow() {
+    const tbody = document.getElementById('subcategoriesTableBody');
+    const noSubcategoriesRow = document.getElementById('noSubcategoriesRow');
     
-    if (noItemsRow) {
-        noItemsRow.remove();
+    if (noSubcategoriesRow) {
+        noSubcategoriesRow.remove();
     }
     
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
         <td class="text-center">${tbody.children.length + 1}</td>
         <td>
-            <input type="text" class="form-control" name="items[${itemCount}][name]" required
-                   placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ (PC)">
+            <input type="text" class="form-control" name="subcategories[${subcategoryCount}][name]" required
+                   placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ">
+        </td>
+        <td>
+            <input type="text" class="form-control" name="subcategories[${subcategoryCount}][description]"
+                   placeholder="คำอธิบายหมวดหมู่ย่อย">
         </td>
         <td class="text-center">
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeItemRow(this)">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeSubcategoryRow(this)">
                 <i class="fas fa-trash"></i>
             </button>
         </td>
     `;
     tbody.appendChild(newRow);
-    itemCount++;
+    subcategoryCount++;
 }
 
-function removeItemRow(button) {
+function removeSubcategoryRow(button) {
     const row = button.closest('tr');
     row.remove();
     
     // Update row numbers
-    const tbody = document.getElementById('itemsTableBody');
+    const tbody = document.getElementById('subcategoriesTableBody');
     const rows = tbody.querySelectorAll('tr');
     
     if (rows.length === 0) {
         tbody.innerHTML = `
-            <tr id="noItemsRow">
-                <td colspan="3" class="text-center text-muted py-3">
-                    <i class="fas fa-info-circle me-2"></i>ยังไม่มีรายการอุปกรณ์
+            <tr id="noSubcategoriesRow">
+                <td colspan="4" class="text-center text-muted py-3">
+                    <i class="fas fa-info-circle me-2"></i>ยังไม่มีหมวดหมู่ย่อย
                 </td>
             </tr>
         `;
@@ -521,44 +517,48 @@ function removeItemRow(button) {
 }
 
 // Functions for new category form
-function addNewItemRow() {
-    const tbody = document.getElementById('newItemsTableBody');
-    const noItemsRow = document.getElementById('noNewItemsRow');
+function addNewSubcategoryRow() {
+    const tbody = document.getElementById('newSubcategoriesTableBody');
+    const noSubcategoriesRow = document.getElementById('noNewSubcategoriesRow');
     
-    if (noItemsRow) {
-        noItemsRow.remove();
+    if (noSubcategoriesRow) {
+        noSubcategoriesRow.remove();
     }
     
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
         <td class="text-center">${tbody.children.length + 1}</td>
         <td>
-            <input type="text" class="form-control" name="items[${newItemCount}][name]"
-                   placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ (PC)">
+            <input type="text" class="form-control" name="subcategories[${newSubcategoryCount}][name]"
+                   placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ">
+        </td>
+        <td>
+            <input type="text" class="form-control" name="subcategories[${newSubcategoryCount}][description]"
+                   placeholder="คำอธิบายหมวดหมู่ย่อย">
         </td>
         <td class="text-center">
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeNewItemRow(this)">
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeNewSubcategoryRow(this)">
                 <i class="fas fa-trash"></i>
             </button>
         </td>
     `;
     tbody.appendChild(newRow);
-    newItemCount++;
+    newSubcategoryCount++;
 }
 
-function removeNewItemRow(button) {
+function removeNewSubcategoryRow(button) {
     const row = button.closest('tr');
     row.remove();
     
     // Update row numbers
-    const tbody = document.getElementById('newItemsTableBody');
+    const tbody = document.getElementById('newSubcategoriesTableBody');
     const rows = tbody.querySelectorAll('tr');
     
     if (rows.length === 0) {
         tbody.innerHTML = `
-            <tr id="noNewItemsRow">
-                <td colspan="3" class="text-center text-muted py-3">
-                    <i class="fas fa-info-circle me-2"></i>ยังไม่มีรายการอุปกรณ์
+            <tr id="noNewSubcategoriesRow">
+                <td colspan="4" class="text-center text-muted py-3">
+                    <i class="fas fa-info-circle me-2"></i>ยังไม่มีหมวดหมู่ย่อย
                 </td>
             </tr>
         `;
@@ -574,7 +574,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
-            const nameInput = this.querySelector('input[name="name"]');
+            const nameInput = this.querySelector('input[name="category_name"]');
             if (!nameInput.value.trim()) {
                 e.preventDefault();
                 alert('กรุณากรอกชื่อหมวดหมู่');

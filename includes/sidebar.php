@@ -59,6 +59,12 @@
                         <i class="fas fa-fw fa-building"></i>
                         แผนก
                     </a>
+                </li>                
+                <li class="nav-item">
+                    <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'buildingfloorplans.php' ? 'active' : ''; ?>" href="buildingfloorplans.php">
+                        <i class="fas fa-fw fa-building"></i>
+                        แผนผังตารางห้อง
+                    </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'employees.php' ? 'active' : ''; ?>" href="employees.php">

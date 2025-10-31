@@ -23,6 +23,28 @@ CREATE TABLE categories (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- สร้างตาราง categories (หมวดหมู่)
+CREATE TABLE categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(2) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);
+
+-- สร้างตาราง categories_items (รายการอุปกรณ์)
+CREATE TABLE categories_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category_code VARCHAR(2) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_code) REFERENCES categories(code) ON DELETE CASCADE
+);
+
 -- สร้างตาราง equipment ใหม่
 CREATE TABLE equipment (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,6 +67,7 @@ CREATE TABLE equipment (
     FOREIGN KEY (category_id) REFERENCES categories(id),
     FOREIGN KEY (category_item_id) REFERENCES categories_items(id),
     FOREIGN KEY (department_id) REFERENCES departments(id)
+    
 );
 
 -- สร้างตาราง maintenance ใหม่

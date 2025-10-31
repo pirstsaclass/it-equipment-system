@@ -1,7 +1,7 @@
 <?php
 require_once 'includes/header.php';
 
-// สถิติครุภัณฑ์ - แก้ไข equipment status
+// สถิติครุภัณฑ์
 $equipment_stats_query = "SELECT 
     COUNT(*) as total,
     SUM(CASE WHEN equipment_status = 'ใหม่' THEN 1 ELSE 0 END) as new,
@@ -11,38 +11,38 @@ $equipment_stats_query = "SELECT
     FROM equipment";
 $equipment_stats = $db->query($equipment_stats_query)->fetch(PDO::FETCH_ASSOC);
 
-// ครุภัณฑ์แยกตามประเภท
-$equipment_by_category_query = "SELECT c.name, COUNT(e.id) as count 
-    FROM categories c 
-    LEFT JOIN equipment e ON c.id = e.category_id 
-    GROUP BY c.id, c.name";
+// ครุภัณฑ์แยกตามประเภท - ใช้ตาราง equipment_categories และ equipment
+$equipment_by_category_query = "SELECT ec.category_name as name, COUNT(e.equipment_id) as count 
+    FROM equipment_categories ec 
+    LEFT JOIN equipment e ON ec.category_id = e.category_id 
+    GROUP BY ec.category_id, ec.category_name";
 $equipment_by_category = $db->query($equipment_by_category_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// ครุภัณฑ์แยกตามสถานะ - แก้ไข equipment status
+// ครุภัณฑ์แยกตามสถานะ
 $equipment_by_status_query = "SELECT equipment_status, COUNT(*) as count 
     FROM equipment 
     GROUP BY equipment_status";
 $equipment_by_status = $db->query($equipment_by_status_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// การซ่อมบำรุงล่าสุด - แก้ไข maintenance status
-$maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, c.name as category_name, ci.name as item_name
-    FROM maintenance m 
-    JOIN equipment e ON m.equipment_id = e.id 
-    LEFT JOIN categories c ON e.category_id = c.id 
-    LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-    ORDER BY m.created_at DESC 
+// การซ่อมบำรุงล่าสุด - ใช้ตาราง maintenance_requests และ equipment
+$maintenance_query = "SELECT mr.*, e.equipment_code as code, e.equipment_name, ec.category_name, es.subcategory_name as item_name
+    FROM maintenance_requests mr 
+    JOIN equipment e ON mr.equipment_id = e.equipment_id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+    ORDER BY mr.created_at DESC 
     LIMIT 5";
 $maintenance_list = $db->query($maintenance_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// อุปกรณ์ที่ซ่อมบ่อย
+// อุปกรณ์ที่ซ่อมบ่อย - ใช้ตาราง maintenance_requests และ equipment
 $frequent_repair_query = "
-    SELECT e.code, e.name, c.name as category_name, ci.name as item_name, COUNT(m.id) as repair_count 
+    SELECT e.equipment_code as code, e.equipment_name as name, ec.category_name, es.subcategory_name as item_name, COUNT(mr.maintenance_id) as repair_count 
     FROM equipment e 
-    JOIN maintenance m ON e.id = m.equipment_id 
-    LEFT JOIN categories c ON e.category_id = c.id 
-    LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-    GROUP BY e.id, e.code, e.name, c.name, ci.name 
-    HAVING COUNT(m.id) > 2 
+    JOIN maintenance_requests mr ON e.equipment_id = mr.equipment_id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+    GROUP BY e.equipment_id, e.equipment_code, e.equipment_name, ec.category_name, es.subcategory_name 
+    HAVING COUNT(mr.maintenance_id) > 2 
     ORDER BY repair_count DESC 
     LIMIT 5";
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
@@ -205,24 +205,25 @@ include 'includes/sidebar.php';
                                     <td><?php echo $maintenance['assigned_technician'] ?: 'ยังไม่ได้มอบหมาย'; ?></td>
                                     <td>
                                         <?php 
-                                        // แก้ไข maintenance status
                                         $status_badge = [
                                             'รอซ่อม' => 'warning',
                                             'กำลังดำเนินการ' => 'info',
                                             'ซ่อมเสร็จ' => 'success',
                                             'ยกเลิก' => 'danger'
                                         ];
+                                        $status = $maintenance['repair_status'];
+                                        $badge_color = isset($status_badge[$status]) ? $status_badge[$status] : 'secondary';
                                         ?>
-                                        <span class="badge bg-<?php echo $status_badge[$maintenance['repair_status']]; ?>">
-                                            <?php echo $maintenance['repair_status']; ?>
+                                        <span class="badge bg-<?php echo $badge_color; ?>">
+                                            <?php echo $status; ?>
                                         </span>
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <a href="maintenance.php?action=edit&id=<?php echo $maintenance['id']; ?>" class="btn btn-primary">
+                                            <a href="maintenance.php?action=edit&id=<?php echo $maintenance['maintenance_id']; ?>" class="btn btn-primary">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="maintenance.php?action=delete&id=<?php echo $maintenance['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                            <a href="maintenance.php?action=delete&id=<?php echo $maintenance['maintenance_id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                         </div>
@@ -294,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Equipment Status Chart - แก้ไข labels
+    // Equipment Status Chart
     const statusCtx = document.getElementById('equipmentStatusChart').getContext('2d');
     const statusChart = new Chart(statusCtx, {
         type: 'doughnut',

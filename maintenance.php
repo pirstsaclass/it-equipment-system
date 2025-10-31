@@ -7,7 +7,7 @@ if (isset($_GET['action'])) {
     $id = isset($_GET['id']) ? $_GET['id'] : null;
     
     if ($action == 'delete' && $id) {
-        $stmt = $db->prepare("DELETE FROM maintenance WHERE id = ?");
+        $stmt = $db->prepare("DELETE FROM maintenance_requests WHERE maintenance_id = ?");
         $stmt->execute([$id]);
         $_SESSION['success'] = "ลบข้อมูลการซ่อมเรียบร้อยแล้ว";
         header("Location: maintenance.php");
@@ -19,70 +19,53 @@ if ($_POST) {
     if (isset($_POST['add_maintenance'])) {
         try {
             $equipment_id = $_POST['equipment_id'];
-            $new_status = $_POST['repair_status'];
+            $repair_status = $_POST['repair_status'];
+            
+            // สร้าง repair_code อัตโนมัติ
+            $repair_code = "R" . date('Ym') . "-" . sprintf('%04d', rand(1000, 9999));
             
             // Insert maintenance record
-            $stmt = $db->prepare("INSERT INTO maintenance (equipment_id, report_date, problem_description, reported_by, assigned_technician, cost, repair_status, solution_description, completed_date, school_name, building_name, floor_name, room_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt = $db->prepare("INSERT INTO maintenance_requests (repair_code, equipment_id, report_date, problem_description, reported_by, assigned_technician, repair_status, solution_description, repair_cost, completed_date, location_school, location_building, location_floor, location_room) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
+                $repair_code,
                 $equipment_id,
                 $_POST['report_date'],
                 $_POST['problem_description'],
                 $_POST['reported_by'],
                 $_POST['assigned_technician'],
-                $_POST['cost'],
-                $new_status,
+                $repair_status,
                 $_POST['solution_description'],
+                $_POST['repair_cost'],
                 $_POST['completed_date'],
-                $_POST['school_name'],
-                $_POST['building_name'],
-                $_POST['floor_name'],
-                $_POST['room_name']
+                $_POST['location_school'],
+                $_POST['location_building'],
+                $_POST['location_floor'],
+                $_POST['location_room']
             ]);
             
             // Update equipment status based on maintenance status
-            if ($new_status == 'ซ่อมเสร็จ') {
-                // ดึงสถานะปัจจุบันของอุปกรณ์
-                $current_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE id = ?");
-                $current_status_stmt->execute([$equipment_id]);
-                $current_equipment_status = $current_status_stmt->fetchColumn();
-                
-                // กำหนดสถานะใหม่ตามสถานะปัจจุบัน
-                if ($current_equipment_status == 'อุปกรณ์ใหม่') {
-                    $equipment_status = 'อุปกรณ์ใหม่-ซ่อมเสร็จ';
-                } else {
-                    $equipment_status = 'อุปกรณ์เดิม-ซ่อมเสร็จ';
-                }
-                
-                $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE id = ?");
-                $update_stmt->execute([$equipment_status, $equipment_id]);
+            if ($repair_status == 'ซ่อมเสร็จ') {
+                $new_equipment_status = 'ใช้งานปกติ';
+                $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE equipment_id = ?");
+                $update_stmt->execute([$new_equipment_status, $equipment_id]);
             } else {
                 // สำหรับสถานะอื่นๆ
-                $equipment_status = '';
-                switch ($new_status) {
+                $new_equipment_status = '';
+                switch ($repair_status) {
                     case 'รอซ่อม':
-                        $equipment_status = 'รอซ่อม';
+                        $new_equipment_status = 'รอซ่อม';
                         break;
                     case 'กำลังดำเนินการ':
-                        $equipment_status = 'กำลังซ่อม';
+                        $new_equipment_status = 'กำลังซ่อม';
                         break;
                     case 'ยกเลิก':
-                        // เมื่อยกเลิก ให้กลับไปเป็นสถานะเดิมก่อนซ่อม
-                        $current_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE id = ?");
-                        $current_status_stmt->execute([$equipment_id]);
-                        $current_equipment_status = $current_status_stmt->fetchColumn();
-                        
-                        // ถ้าสถานะปัจจุบันเป็นสถานะซ่อม ให้กลับไปเป็นอุปกรณ์ใหม่/เดิม
-                        if (strpos($current_equipment_status, 'อุปกรณ์เดิม') !== false) {
-                            $equipment_status = 'อุปกรณ์เดิม';
-                        } else {
-                            $equipment_status = 'อุปกรณ์ใหม่';
-                        }
+                        $new_equipment_status = 'ใช้งานปกติ';
                         break;
                 }
                 
-                if ($equipment_status) {
-                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE id = ?");
-                    $update_stmt->execute([$equipment_status, $equipment_id]);
+                if ($new_equipment_status) {
+                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE equipment_id = ?");
+                    $update_stmt->execute([$new_equipment_status, $equipment_id]);
                 }
             }
             
@@ -100,74 +83,54 @@ if ($_POST) {
     if (isset($_POST['edit_maintenance'])) {
         try {
             $equipment_id = $_POST['equipment_id'];
-            $new_status = $_POST['repair_status'];
+            $new_repair_status = $_POST['repair_status'];
             
             // Get old status before update
-            $old_status_stmt = $db->prepare("SELECT repair_status FROM maintenance WHERE id = ?");
-            $old_status_stmt->execute([$_POST['id']]);
-            $old_status = $old_status_stmt->fetchColumn();
-            
+            $old_repair_status_stmt = $db->prepare("SELECT repair_status FROM maintenance_requests WHERE maintenance_id = ?");
+            $old_repair_status_stmt->execute([$_POST['maintenance_id']]);
+            $old_repair_status = $old_repair_status_stmt->fetchColumn();
+
             // Update maintenance record
-            $stmt = $db->prepare("UPDATE maintenance SET report_date=?, problem_description=?, reported_by=?, assigned_technician=?, cost=?, repair_status=?, solution_description=?, completed_date=?, school_name=?, building_name=?, floor_name=?, room_name=?, updated_at=NOW() WHERE id=?");
+            $stmt = $db->prepare("UPDATE maintenance_requests SET report_date=?, problem_description=?, reported_by=?, assigned_technician=?, repair_status=?, solution_description=?, repair_cost=?, completed_date=?, location_school=?, location_building=?, location_floor=?, location_room=? WHERE maintenance_id=?");
             $stmt->execute([
                 $_POST['report_date'],
                 $_POST['problem_description'],
                 $_POST['reported_by'],
                 $_POST['assigned_technician'],
-                $_POST['cost'],
-                $new_status,
+                $new_repair_status,
                 $_POST['solution_description'],
+                $_POST['repair_cost'],
                 $_POST['completed_date'],
-                $_POST['school_name'],
-                $_POST['building_name'],
-                $_POST['floor_name'],
-                $_POST['room_name'],
-                $_POST['id']
+                $_POST['location_school'],
+                $_POST['location_building'],
+                $_POST['location_floor'],
+                $_POST['location_room'],
+                $_POST['maintenance_id']
             ]);
             
             // Update equipment status based on maintenance status
-            if ($old_status != $new_status) {
-                if ($new_status == 'ซ่อมเสร็จ') {
-                    // ดึงสถานะปัจจุบันของอุปกรณ์
-                    $current_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE id = ?");
-                    $current_status_stmt->execute([$equipment_id]);
-                    $current_equipment_status = $current_status_stmt->fetchColumn();
-                    
-                    // กำหนดสถานะใหม่ตามสถานะปัจจุบัน
-                    if (strpos($current_equipment_status, 'อุปกรณ์ใหม่') !== false) {
-                        $equipment_status = 'อุปกรณ์ใหม่-ซ่อมเสร็จ';
-                    } else {
-                        $equipment_status = 'อุปกรณ์เดิม-ซ่อมเสร็จ';
-                    }
+            if ($old_repair_status != $new_repair_status) {
+                if ($new_repair_status == 'ซ่อมเสร็จ') {
+                    $new_equipment_status = 'ใช้งานปกติ';
                 } else {
                     // สำหรับสถานะอื่นๆ
-                    $equipment_status = '';
-                    switch ($new_status) {
+                    $new_equipment_status = '';
+                    switch ($new_repair_status) {
                         case 'รอซ่อม':
-                            $equipment_status = 'รอซ่อม';
+                            $new_equipment_status = 'รอซ่อม';
                             break;
                         case 'กำลังดำเนินการ':
-                            $equipment_status = 'กำลังซ่อม';
+                            $new_equipment_status = 'กำลังซ่อม';
                             break;
                         case 'ยกเลิก':
-                            // เมื่อยกเลิก ให้กลับไปเป็นสถานะเดิมก่อนซ่อม
-                            $current_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE id = ?");
-                            $current_status_stmt->execute([$equipment_id]);
-                            $current_equipment_status = $current_status_stmt->fetchColumn();
-                            
-                            // ถ้าสถานะปัจจุบันเป็นสถานะซ่อม ให้กลับไปเป็นอุปกรณ์ใหม่/เดิม
-                            if (strpos($current_equipment_status, 'อุปกรณ์เดิม') !== false) {
-                                $equipment_status = 'อุปกรณ์เดิม';
-                            } else {
-                                $equipment_status = 'อุปกรณ์ใหม่';
-                            }
+                            $new_equipment_status = 'ใช้งานปกติ';
                             break;
                     }
                 }
                 
-                if ($equipment_status) {
-                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE id = ?");
-                    $update_stmt->execute([$equipment_status, $equipment_id]);
+                if ($new_equipment_status) {
+                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE equipment_id = ?");
+                    $update_stmt->execute([$new_equipment_status, $equipment_id]);
                 }
             }
             
@@ -183,39 +146,37 @@ if ($_POST) {
     }
 }
 
-// Get maintenance list with location data
-$maintenance_query = "SELECT m.*, e.code, e.name as equipment_name, e.id as equipment_id, e.equipment_status,
-                             c.name as category_name, ci.name as item_name
-                      FROM maintenance m 
-                      JOIN equipment e ON m.equipment_id = e.id 
-                      LEFT JOIN categories c ON e.category_id = c.id 
-                      LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-                      ORDER BY m.created_at DESC";
+// Get maintenance list with equipment data
+$maintenance_query = "SELECT mr.*, e.equipment_code, e.equipment_name, e.equipment_status,
+                             ec.category_name, es.subcategory_name
+                      FROM maintenance_requests mr 
+                      JOIN equipment e ON mr.equipment_id = e.equipment_id 
+                      LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
+                      LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+                      ORDER BY mr.created_at DESC";
 $maintenance_list = $db->query($maintenance_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get equipment for dropdown
-$equipment_list = $db->query("SELECT e.id, e.code, e.name, e.equipment_status, c.name as category_name, ci.name as item_name 
-                              FROM equipment e 
-                              LEFT JOIN categories c ON e.category_id = c.id 
-                              LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-                              ORDER BY e.code")->fetchAll(PDO::FETCH_ASSOC);
+$equipment_list = $db->query("SELECT equipment_id, equipment_code, equipment_name, equipment_status, 
+                                     category_id, subcategory_id 
+                              FROM equipment 
+                              ORDER BY equipment_name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get employees for technician dropdown
-$employees_query = "SELECT e.id, e.first_name, e.last_name, d.name as department_name 
-                    FROM employees e 
-                    LEFT JOIN departments d ON e.department_id = d.id 
-                    ORDER BY e.first_name, e.last_name";
+$employees_query = "SELECT employee_id, first_name, last_name, department_id 
+                    FROM employees 
+                    ORDER BY first_name, last_name";
 $employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get frequently repaired equipment
 $frequent_repair_query = "
-    SELECT e.code, e.name, c.name as category_name, ci.name as item_name, COUNT(m.id) as repair_count 
+    SELECT e.equipment_name, ec.category_name, es.subcategory_name, COUNT(mr.maintenance_id) as repair_count 
     FROM equipment e 
-    JOIN maintenance m ON e.id = m.equipment_id 
-    LEFT JOIN categories c ON e.category_id = c.id 
-    LEFT JOIN categories_items ci ON e.category_item_id = ci.id 
-    GROUP BY e.id, e.code, e.name, c.name, ci.name 
-    HAVING COUNT(m.id) > 2 
+    JOIN maintenance_requests mr ON e.equipment_id = mr.equipment_id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+    GROUP BY e.equipment_id, e.equipment_name, ec.category_name, es.subcategory_name 
+    HAVING COUNT(mr.maintenance_id) > 2 
     ORDER BY repair_count DESC";
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
 
@@ -262,7 +223,7 @@ include 'includes/sidebar.php';
         <h6><i class="fas fa-exclamation-triangle"></i> อุปกรณ์ที่ซ่อมบ่อย</h6>
         <ul class="mb-0">
             <?php foreach($frequent_repairs as $freq): ?>
-            <li><?php echo $freq['code'] . ' - ' . $freq['name'] . ' (ซ่อมแล้ว ' . $freq['repair_count'] . ' ครั้ง)'; ?></li>
+            <li><?php echo $freq['equipment_name'] . ' (' . $freq['category_name'] . ') - ซ่อมแล้ว ' . $freq['repair_count'] . ' ครั้ง'; ?></li>
             <?php endforeach; ?>
         </ul>
     </div>
@@ -277,6 +238,7 @@ include 'includes/sidebar.php';
                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
+                            <th width="120">รหัสการซ่อม</th>
                             <th width="110">รหัสครุภัณฑ์</th>
                             <th width="150">ชื่ออุปกรณ์</th>
                             <th width="150">สถานที่</th>
@@ -293,8 +255,11 @@ include 'includes/sidebar.php';
                         <?php foreach($maintenance_list as $maintenance): ?>
                         <tr>
                             <td>
+                                <strong class="text-primary"><?php echo $maintenance['repair_code']; ?></strong>
+                            </td>
+                            <td>
                                 <a href="equipment_detail.php?id=<?php echo $maintenance['equipment_id']; ?>" class="text-decoration-none" title="ดูรายละเอียดอุปกรณ์">
-                                    <strong class="text-primary"><?php echo $maintenance['code']; ?></strong>
+                                    <strong class="text-info"><?php echo $maintenance['equipment_code']; ?></strong>
                                 </a>
                             </td>
                             <td>
@@ -307,14 +272,14 @@ include 'includes/sidebar.php';
                                 <small class="text-muted">
                                     <?php 
                                     $location_parts = [];
-                                    if ($maintenance['school_name']) {
+                                    if ($maintenance['location_school']) {
                                         // แสดงชื่อย่อโรงเรียนแทนชื่อเต็ม
-                                        $school_short = $schools_short[$maintenance['school_name']] ?? $maintenance['school_name'];
+                                        $school_short = $schools_short[$maintenance['location_school']] ?? $maintenance['location_school'];
                                         $location_parts[] = $school_short;
                                     }
-                                    if ($maintenance['building_name']) $location_parts[] = $maintenance['building_name'];
-                                    if ($maintenance['floor_name']) $location_parts[] = $maintenance['floor_name'];
-                                    if ($maintenance['room_name']) $location_parts[] = $maintenance['room_name'];
+                                    if ($maintenance['location_building']) $location_parts[] = $maintenance['location_building'];
+                                    if ($maintenance['location_floor']) $location_parts[] = $maintenance['location_floor'];
+                                    if ($maintenance['location_room']) $location_parts[] = $maintenance['location_room'];
                                     
                                     echo implode('/', $location_parts);
                                     ?>
@@ -323,7 +288,7 @@ include 'includes/sidebar.php';
                             <td>
                                 <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
                                      title="<?php echo htmlspecialchars($maintenance['problem_description']); ?>">
-                                    <?php echo mb_substr($maintenance['problem_description'], 0, 50) . (mb_strlen($mainipment['problem_description']) > 50 ? '...' : ''); ?>
+                                    <?php echo mb_substr($maintenance['problem_description'], 0, 50) . (mb_strlen($maintenance['problem_description']) > 50 ? '...' : ''); ?>
                                 </div>
                             </td>
                             <td class="text-center">
@@ -339,13 +304,13 @@ include 'includes/sidebar.php';
                             </td>
                             <td class="text-center">
                                 <?php 
-                                $status_badge = [
+                                $repairStatus_badge = [
                                     'รอซ่อม' => 'warning',
                                     'กำลังดำเนินการ' => 'info',
                                     'ซ่อมเสร็จ' => 'success',
                                     'ยกเลิก' => 'danger'
                                 ];
-                                $status_class = $status_badge[$maintenance['repair_status']] ?? 'secondary';
+                                $status_class = $repairStatus_badge[$maintenance['repair_status']] ?? 'secondary';
                                 ?>
                                 <span class="badge bg-<?php echo $status_class; ?>">
                                     <?php echo $maintenance['repair_status']; ?>
@@ -354,17 +319,12 @@ include 'includes/sidebar.php';
                             <td class="text-center">
                                 <?php 
                                 $equip_status_badge = [
-                                    'อุปกรณ์ใหม่' => 'success',
-                                    'อุปกรณ์เดิม' => 'primary',
-                                    'อุปกรณ์ใหม่-ซ่อมเสร็จ' => 'success',
-                                    'อุปกรณ์เดิม-ซ่อมเสร็จ' => 'primary',
-                                    'รอซ่อม' => 'info',
-                                    'กำลังซ่อม' => 'warning',
+                                    'ใหม่' => 'success',
                                     'ใช้งานปกติ' => 'primary',
-                                    'ชำรุด' => 'warning',
-                                    'ซ่อมเสร็จแล้ว' => 'success',
-                                    'ส่งคืนแล้ว' => 'primary',
-                                    'จำหน่ายแล้ว' => 'danger'
+                                    'รอซ่อม' => 'warning',
+                                    'กำลังซ่อม' => 'info',
+                                    'ชำรุด' => 'danger',
+                                    'จำหน่ายแล้ว' => 'secondary'
                                 ];
                                 $equip_status_class = $equip_status_badge[$maintenance['equipment_status']] ?? 'secondary';
                                 ?>
@@ -377,7 +337,7 @@ include 'includes/sidebar.php';
                                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#maintenanceModal" onclick='editMaintenance(<?php echo json_encode($maintenance); ?>)' title="แก้ไข">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <a href="maintenance.php?action=delete&id=<?php echo $maintenance['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')" title="ลบ">
+                                    <a href="maintenance.php?action=delete&id=<?php echo $maintenance['maintenance_id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')" title="ลบ">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </div>
@@ -401,7 +361,8 @@ include 'includes/sidebar.php';
             </div>
             <form method="POST" id="maintenanceForm">
                 <div class="modal-body">
-                    <input type="hidden" name="id" id="maintenance_id">
+                    <input type="hidden" name="maintenance_id" id="maintenance_id">
+                    <input type="hidden" name="repair_code" id="repair_code">
                     
                     <!-- Location Selection -->
                     <div class="row mb-4">
@@ -410,7 +371,7 @@ include 'includes/sidebar.php';
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">โรงเรียน *</label>
-                            <select class="form-control" name="school_name" id="school_name" required onchange="updateBuildings()">
+                            <select class="form-control" name="location_school" id="location_school" required onchange="updateBuildings()">
                                 <option value="">เลือกโรงเรียน</option>
                                 <option value="โรงเรียนวารีเชียงใหม่">โรงเรียนวารีเชียงใหม่ (VCS)</option>
                                 <option value="โรงเรียนอนุบาลวารีเชียงใหม่">โรงเรียนอนุบาลวารีเชียงใหม่ (VKS)</option>
@@ -418,31 +379,20 @@ include 'includes/sidebar.php';
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">แผนก *</label>
-                            <select class="form-control" name="department_type" id="department_type" required>
-                                <option value="">เลือกแผนก</option>
-                                <option value="อำนวยการ">อำนวยการ</option>
-                                <option value="อนุบาล">อนุบาล</option>
-                                <option value="ประถม">ประถม</option>
-                                <option value="มัธยม">มัธยม</option>
-                                <option value="สนับสนุน">สนับสนุน</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
                             <label class="form-label">ตึก/อาคาร *</label>
-                            <select class="form-control" name="building_name" id="building_name" required onchange="updateFloors()">
+                            <select class="form-control" name="location_building" id="location_building" required onchange="updateFloors()">
                                 <option value="">เลือกตึก/อาคาร</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">ชั้นเรียน *</label>
-                            <select class="form-control" name="floor_name" id="floor_name" required>
-                                <option value="">เลือกชั้นเรียน</option>
+                            <label class="form-label">ชั้น *</label>
+                            <select class="form-control" name="location_floor" id="location_floor" required>
+                                <option value="">เลือกชั้น</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label">ชื่อ/เลขห้อง *</label>
-                            <input type="text" class="form-control" name="room_name" id="room_name" placeholder="เช่น 101, 201, ห้องธุรการ" required>
+                            <label class="form-label">ห้อง *</label>
+                            <input type="text" class="form-control" name="location_room" id="location_room" placeholder="เช่น 101, 201, ห้องธุรการ" required>
                         </div>
                     </div>
 
@@ -456,8 +406,8 @@ include 'includes/sidebar.php';
                             <select class="form-control" name="equipment_id" id="equipment_id" required onchange="showEquipmentStatus()">
                                 <option value="">เลือกครุภัณฑ์</option>
                                 <?php foreach($equipment_list as $equipment): ?>
-                                <option value="<?php echo $equipment['id']; ?>" data-status="<?php echo $equipment['equipment_status']; ?>">
-                                    <?php echo $equipment['code'] . ' - ' . $equipment['name'] . ' (' . $equipment['category_name'] . ') - สถานะ: ' . $equipment['equipment_status']; ?>
+                                <option value="<?php echo $equipment['equipment_id']; ?>" data-status="<?php echo $equipment['equipment_status']; ?>">
+                                    <?php echo $equipment['equipment_code'] . ' - ' . $equipment['equipment_name'] . ' (สถานะ: ' . $equipment['equipment_status'] . ')'; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -504,9 +454,6 @@ include 'includes/sidebar.php';
                                 <?php foreach($employees_list as $employee): ?>
                                 <option value="<?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?>">
                                     <?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?>
-                                    <?php if ($employee['department_name']): ?>
-                                        (<?php echo $employee['department_name']; ?>)
-                                    <?php endif; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -516,7 +463,7 @@ include 'includes/sidebar.php';
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">ค่าใช้จ่าย (บาท)</label>
-                            <input type="number" step="0.01" class="form-control" name="cost" id="cost" value="0" min="0">
+                            <input type="number" step="0.01" class="form-control" name="repair_cost" id="repair_cost" value="0" min="0">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">วันที่ซ่อมเสร็จ</label>
@@ -571,45 +518,53 @@ const schoolData = {
 function clearForm() {
     document.getElementById('maintenanceForm').reset();
     document.getElementById('maintenance_id').value = '';
+    
+    // สร้าง repair_code อัตโนมัติ
+    const now = new Date();
+    const yearMonth = now.toISOString().slice(0,7).replace(/-/g, '');
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('repair_code').value = 'R' + yearMonth + '-' + randomNum;
+    
     document.getElementById('report_date').value = '<?php echo date('Y-m-d'); ?>';
-    document.getElementById('cost').value = '0';
+    document.getElementById('repair_cost').value = '0';
     document.getElementById('maintenanceModalLabel').textContent = 'แจ้งซ่อมใหม่';
     document.getElementById('submitBtn').name = 'add_maintenance';
     document.getElementById('submitBtn').textContent = 'บันทึก';
     document.getElementById('equipment_id').disabled = false;
     
     // Reset location dropdowns
-    document.getElementById('building_name').innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
-    document.getElementById('floor_name').innerHTML = '<option value="">เลือกชั้นเรียน</option>';
+    document.getElementById('location_building').innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
+    document.getElementById('location_floor').innerHTML = '<option value="">เลือกชั้น</option>';
     
     // Hide equipment status alert
     document.getElementById('equipmentStatusAlert').style.display = 'none';
 }
 
 function editMaintenance(maintenance) {
-    document.getElementById('maintenance_id').value = maintenance.id;
+    document.getElementById('maintenance_id').value = maintenance.maintenance_id;
+    document.getElementById('repair_code').value = maintenance.repair_code || '';
     document.getElementById('equipment_id').value = maintenance.equipment_id;
     document.getElementById('report_date').value = maintenance.report_date;
     document.getElementById('problem_description').value = maintenance.problem_description || '';
     document.getElementById('reported_by').value = maintenance.reported_by || '';
     document.getElementById('assigned_technician').value = maintenance.assigned_technician || '';
-    document.getElementById('cost').value = maintenance.cost || '0';
+    document.getElementById('repair_cost').value = maintenance.repair_cost || '0';
     document.getElementById('repair_status').value = maintenance.repair_status || 'รอซ่อม';
     document.getElementById('solution_description').value = maintenance.solution_description || '';
     document.getElementById('completed_date').value = maintenance.completed_date || '';
-    document.getElementById('room_name').value = maintenance.room_name || '';
+    document.getElementById('location_room').value = maintenance.location_room || '';
     
     // Set location values
-    if (maintenance.school_name) {
-        document.getElementById('school_name').value = maintenance.school_name;
+    if (maintenance.location_school) {
+        document.getElementById('location_school').value = maintenance.location_school;
         updateBuildings();
         setTimeout(() => {
-            if (maintenance.building_name) {
-                document.getElementById('building_name').value = maintenance.building_name;
+            if (maintenance.location_building) {
+                document.getElementById('location_building').value = maintenance.location_building;
                 updateFloors();
                 setTimeout(() => {
-                    if (maintenance.floor_name) {
-                        document.getElementById('floor_name').value = maintenance.floor_name;
+                    if (maintenance.location_floor) {
+                        document.getElementById('location_floor').value = maintenance.location_floor;
                     }
                 }, 100);
             }
@@ -629,13 +584,13 @@ function editMaintenance(maintenance) {
 
 // อัปเดตตึกตามโรงเรียนที่เลือก
 function updateBuildings() {
-    const schoolSelect = document.getElementById('school_name');
-    const buildingSelect = document.getElementById('building_name');
-    const floorSelect = document.getElementById('floor_name');
+    const schoolSelect = document.getElementById('location_school');
+    const buildingSelect = document.getElementById('location_building');
+    const floorSelect = document.getElementById('location_floor');
     
     // ล้าง dropdown ตึกและชั้น
     buildingSelect.innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
-    floorSelect.innerHTML = '<option value="">เลือกชั้นเรียน</option>';
+    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
     
     const selectedSchool = schoolSelect.value;
     if (selectedSchool && schoolData[selectedSchool]) {
@@ -651,12 +606,12 @@ function updateBuildings() {
 
 // อัปเดตชั้นตามตึกที่เลือก
 function updateFloors() {
-    const schoolSelect = document.getElementById('school_name');
-    const buildingSelect = document.getElementById('building_name');
-    const floorSelect = document.getElementById('floor_name');
+    const schoolSelect = document.getElementById('location_school');
+    const buildingSelect = document.getElementById('location_building');
+    const floorSelect = document.getElementById('location_floor');
     
     // ล้าง dropdown ชั้น
-    floorSelect.innerHTML = '<option value="">เลือกชั้นเรียน</option>';
+    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
     
     const selectedSchool = schoolSelect.value;
     const selectedBuilding = buildingSelect.value;
@@ -680,12 +635,12 @@ function updateFloors() {
 function showEquipmentStatus() {
     const equipmentSelect = document.getElementById('equipment_id');
     const selectedOption = equipmentSelect.options[equipmentSelect.selectedIndex];
-    const status = selectedOption.getAttribute('data-status');
+    const equipment_status = selectedOption.getAttribute('data-status');
     const alertDiv = document.getElementById('equipmentStatusAlert');
     const statusText = document.getElementById('equipmentStatusText');
     
-    if (status) {
-        statusText.textContent = 'สถานะปัจจุบันของครุภัณฑ์: ' + status;
+    if (equipment_status) {
+        statusText.textContent = 'สถานะปัจจุบันของครุภัณฑ์: ' + equipment_status;
         alertDiv.style.display = 'block';
     } else {
         alertDiv.style.display = 'none';
@@ -697,11 +652,11 @@ $(document).ready(function() {
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
         },
-        order: [[4, 'desc']], // Sort by report date descending
+        order: [[5, 'desc']], // Sort by report date descending
         pageLength: 25,
         responsive: true,
         columnDefs: [
-            { orderable: false, targets: [9] } // Disable sorting for action column
+            { orderable: false, targets: [10] } // Disable sorting for action column
         ]
     });
 });
