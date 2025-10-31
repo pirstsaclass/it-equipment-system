@@ -42,7 +42,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'classroom_equipment.php' ? 'active' : ''; ?>" href="classroom_equipment.php">
+                    <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'equipment_classroom.php' ? 'active' : ''; ?>" href="equipment_classroom.php">
                         <i class="fas fa-chalkboard-teacher"></i>
                         <span>อุปกรณ์ในห้องเรียน</span>
                     </a>

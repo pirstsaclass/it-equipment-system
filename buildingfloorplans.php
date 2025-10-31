@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 // ตั้งค่าปีการศึกษาเริ่มต้น
 $current_year = date('Y') + 543; // แปลงเป็น พ.ศ.
 $selected_year = isset($_GET['year']) ? $_GET['year'] : $current_year;
-$selected_school = isset($_GET['school']) ? $_GET['school'] : '';
+$selected_school = isset($_GET['school_name']) ? $_GET['school_name '] : '';
 $selected_building = isset($_GET['building']) ? $_GET['building'] : '';
 
 // CRUD Operations for Floor Plans
@@ -29,7 +29,7 @@ if (isset($_GET['action'])) {
         $stmt->execute([$id]);
         $_SESSION['success'] = "ลบแผนผังตารางห้องเรียบร้อยแล้ว";
         
-        header("Location: departments.php?year=" . $selected_year . "&school=" . $selected_school . "&building=" . $selected_building);
+        header("Location: departments.php?year=" . $selected_year . "&school_name=" . $selected_school . "&building=" . $selected_building);
         exit();
     }
 }
@@ -39,13 +39,13 @@ if ($_POST) {
         // Handle image upload
         $image_name = '';
         if (isset($_FILES['plan_image']) && $_FILES['plan_image']['error'] == 0) {
-            $image_name = uploadFloorPlanImage($_FILES['plan_image'], $_POST['school'], $_POST['building'], $_POST['academic_year']);
+            $image_name = uploadFloorPlanImage($_FILES['plan_image'], $_POST['school_name'], $_POST['building'], $_POST['academic_year']);
         }
         
         if ($image_name) {
             // Check if plan already exists
             $check_stmt = $db->prepare("SELECT id FROM building_floor_plans WHERE school = ? AND building = ? AND academic_year = ?");
-            $check_stmt->execute([$_POST['school'], $_POST['building'], $_POST['academic_year']]);
+            $check_stmt->execute([$_POST['school_name'], $_POST['building'], $_POST['academic_year']]);
             $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existing) {
@@ -66,9 +66,9 @@ if ($_POST) {
                 $_SESSION['success'] = "อัพเดทแผนผังตารางห้องเรียบร้อยแล้ว";
             } else {
                 // Insert new plan
-                $stmt = $db->prepare("INSERT INTO building_floor_plans (school, building, academic_year, plan_image, description) VALUES (?, ?, ?, ?, ?)");
+                $stmt = $db->prepare("INSERT INTO building_floor_plans (school_name, building, academic_year, plan_image, description) VALUES (?, ?, ?, ?, ?)");
                 $stmt->execute([
-                    $_POST['school'],
+                    $_POST['school_name'],
                     $_POST['building'],
                     $_POST['academic_year'],
                     $image_name,
@@ -80,13 +80,13 @@ if ($_POST) {
             $_SESSION['error'] = "กรุณาเลือกรูปภาพแผนผัง";
         }
         
-        header("Location: departments.php?year=" . $selected_year . "&school=" . $selected_school . "&building=" . $selected_building);
+        header("Location: departments.php?year=" . $selected_year . "&school_name=" . $selected_school . "&building=" . $selected_building);
         exit();
     }
 }
 
 // Function to handle floor plan image upload
-function uploadFloorPlanImage($file, $school, $building, $year) {
+function uploadFloorPlanImage($file, $school_name, $building, $year) {
     $upload_dir = 'uploads/floor_plans/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
@@ -139,7 +139,7 @@ function uploadFloorPlanImage($file, $school, $building, $year) {
 }
 
 // Get filter options from building_floor_plans table
-$schools_query = "SELECT DISTINCT school FROM building_floor_plans ORDER BY school";
+$schools_query = "SELECT DISTINCT school_name FROM building_floor_plans ORDER BY school_name";
 $schools_result = $db->query($schools_query);
 $schools_list = $schools_result ? $schools_result->fetchAll(PDO::FETCH_COLUMN) : [];
 

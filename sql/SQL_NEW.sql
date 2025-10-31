@@ -1,12 +1,12 @@
 -- สร้างฐานข้อมูล
-CREATE DATABASE IF NOT EXISTS equipment_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE equipment_management;
+CREATE DATABASE IF NOT EXISTS school_it_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE school_it_management;
 
 -- ตาราง users (ผู้ใช้งานระบบ)
 CREATE TABLE IF NOT EXISTS users (
     user_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสผู้ใช้ระบบ (Primary Key)',
     username VARCHAR(50) NOT NULL UNIQUE COMMENT 'ชื่อผู้ใช้สำหรับเข้าสู่ระบบ',
-    password_hash VARCHAR(255) NOT NULL COMMENT 'รหัสผ่านที่เข้ารหัสแล้ว',
+    password VARCHAR(255) NOT NULL COMMENT 'รหัสผ่านที่เข้ารหัสแล้ว',
     full_name VARCHAR(100) NOT NULL COMMENT 'ชื่อ-นามสกุลผู้ใช้',
     email VARCHAR(100) COMMENT 'ที่อยู่อีเมลผู้ใช้',
     user_role ENUM('admin', 'user', 'technician') DEFAULT 'user' COMMENT 'บทบาทผู้ใช้ (admin, user, technician)',
@@ -25,65 +25,6 @@ CREATE TABLE IF NOT EXISTS departments (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
     INDEX idx_department_name (department_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
----ตาราง
-CREATE TABLE `classroom_equipment` (
-  `id` int(11) NOT NULL,
-  `equipment_code` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `school` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `building` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `floor` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `room` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `room_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `quantity` int(11) NOT NULL DEFAULT 1,
-  `installation_date` date DEFAULT NULL,
-  `notes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-CREATE TABLE classroom_equipment (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    room_number VARCHAR(20) NOT NULL,
-    equipment_name VARCHAR(255) NOT NULL,
-    quantity INT NOT NULL DEFAULT 1,
-    equipment_condition VARCHAR(50) DEFAULT 'ดี',  -- เปลี่ยนจาก condition เป็น equipment_condition
-    description TEXT,
-    created_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-);
---
--- Dumping data for table `classroom_equipment`
---
-
-INSERT INTO `classroom_equipment` (`id`, `equipment_code`, `school`, `building`, `floor`, `room`, `room_name`, `quantity`, `installation_date`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 'IT-2023-0003', 'โรงเรียนวารีเชียงใหม่', 'ตึก3-ประถม', 'ชั้น 1', '311', 'Y', 1, '2025-10-29', '', '2025-10-30 08:38:23', '2025-10-30 08:38:23'),
-(2, 'IT-2023-0001', 'โรงเรียนนานาชาติวารีเชียงใหม่', 'ตึก8', 'ชั้น 1', '8112Office', 'Ofice Inter', 1, '2025-10-27', '', '2025-10-30 08:40:03', '2025-10-30 08:40:03');
-
---table `buildingfloorplans`
-
-CREATE TABLE `building_floor_plans` (
-  `id` int(11) NOT NULL,
-  `school` varchar(255) NOT NULL,
-  `building` varchar(255) NOT NULL,
-  `academic_year` int(11) NOT NULL,
-  `plan_image` varchar(255) NOT NULL,
-  `description` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-
---
--- Dumping data for table `building_floor_plans`
---
-
-INSERT INTO `building_floor_plans` (`id`, `school`, `building`, `academic_year`, `plan_image`, `description`, `created_at`, `updated_at`) VALUES
-(1, 'โรงเรียนวารีเชียงใหม่', 'อาคาร3-ประถม', 2568, '2568_VCS_อาคาร3ประถม.jpg', '', '2025-10-30 05:09:00', '2025-10-30 05:18:43'),
-(2, 'โรงเรียนวารีเชียงใหม่', 'อาคาร4-ประถม', 2568, '2568_VCS_อาคาร4ประถม.jpg', '', '2025-10-30 05:09:20', '2025-10-30 05:19:04'),
-(3, 'โรงเรียนวารีเชียงใหม่', 'อาคาร7-มัธยม', 2568, '2568_VCS_อาคาร7มัธยม.jpg', '', '2025-10-30 05:09:35', '2025-10-30 05:19:38'),
-(4, 'โรงเรียนวารีเชียงใหม่', 'อาคาร4-มัธยม', 2568, '2568_VCS_อาคาร4มัธยม.jpg', '', '2025-10-30 05:19:24', '2025-10-30 05:19:24');
-
 
 -- ตาราง employees (พนักงาน)
 CREATE TABLE IF NOT EXISTS employees (
@@ -237,10 +178,42 @@ CREATE TABLE IF NOT EXISTS equipment_disposals (
     INDEX idx_disposal_date (disposal_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ตาราง building_floor_plans (แผนผังตารางห้อง)
+CREATE TABLE IF NOT EXISTS building_floor_plans (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    school VARCHAR(255) NOT NULL,
+    building VARCHAR(255) NOT NULL,
+    academic_year INT NOT NULL,
+    plan_image VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_plan (school, building, academic_year)
+);
+
+-- ตาราง equipment_classroom (แผนผังตารางห้อง)
+CREATE TABLE IF NOT EXISTS equipment_classroom (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    equipment_code VARCHAR(50) NOT NULL,
+    school VARCHAR(255) NOT NULL,
+    building VARCHAR(255) NOT NULL,
+    floor VARCHAR(100) NOT NULL,
+    room VARCHAR(100) NOT NULL,
+    room_name VARCHAR(255),
+    quantity INT NOT NULL DEFAULT 1,
+    installation_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (equipment_code) REFERENCES equipment(equipment_code) ON DELETE CASCADE,
+    INDEX idx_school_building (school, building, floor)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- ข้อมูลตัวอย่าง
 
 -- เพิ่ม admin user (password: admin123)
-INSERT INTO users (username, password_hash, full_name, email_address, user_role) VALUES
+INSERT INTO users (username, password, full_name, email, user_role) VALUES
 ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ผู้ดูแลระบบ', 'admin@varee.ac.th', 'admin');
 
 -- เพิ่มแผนก
@@ -303,4 +276,45 @@ INSERT INTO maintenance_requests (repair_code, equipment_id, report_date, proble
 ('R202410-0001', 1, '2024-10-01', 'คอมพิวเตอร์เปิดไม่ติด', 'คุณสมศรี', 'สมชาย ใจดี', 'ซ่อมเสร็จ', 'เปลี่ยนแหล่งจ่ายไฟใหม่', 2500.00, '2024-10-03', 'โรงเรียนวารีเชียงใหม่', 'ตึก1-อำนวยการ', 'ชั้น 1', 'ห้องธุรการ'),
 ('R202410-0002', 3, '2024-10-15', 'ภาพไม่ชัด มีจุดดำ', 'คุณวิชัย', 'สมชาย ใจดี', 'กำลังดำเนินการ', NULL, 0, NULL, 'โรงเรียนวารีเชียงใหม่', 'ตึก3-ประถม', 'ชั้น 2', 'ห้องประชุม'),
 ('R202410-0003', 2, '2024-10-20', 'แบตเตอรี่เสื่อม ใช้งานได้ไม่เกิน 1 ชั่วโมง', 'คุณสมหญิง', NULL, 'รอซ่อม', NULL, 0, NULL, 'โรงเรียนวารีเชียงใหม่', 'ตึก7-มัธยม', 'ชั้น 2', '201');
+
+
+-- แก้ไข Advand
+-- ตาราง building_floor_plans (แผนผังอาคารและชั้น)
+CREATE TABLE IF NOT EXISTS building_floor_plans (
+    plan_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสแผนผัง (Primary Key)',
+    school_name VARCHAR(255) NOT NULL COMMENT 'ชื่อโรงเรียน',
+    building_name VARCHAR(255) NOT NULL COMMENT 'ชื่ออาคาร',
+    academic_year INT NOT NULL COMMENT 'ปีการศึกษา',
+    floor_plan_image VARCHAR(255) NOT NULL COMMENT 'เส้นทางไฟล์ภาพแผนผัง',
+    plan_description TEXT COMMENT 'คำอธิบายแผนผัง',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
+    UNIQUE KEY unique_plan (school_name, building_name, academic_year) COMMENT 'ป้องกันแผนผังซ้ำสำหรับโรงเรียน-อาคาร-ปีการศึกษาเดียวกัน',
+    INDEX idx_school_building (school_name, building_name) COMMENT 'ดัชนีสำหรับค้นหาตามโรงเรียนและอาคาร',
+    INDEX idx_academic_year (academic_year) COMMENT 'ดัชนีสำหรับค้นหาตามปีการศึกษา'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ตาราง equipment_classroom (การจัดวางครุภัณฑ์ในห้องเรียน)
+CREATE TABLE IF NOT EXISTS equipment_classroom (
+    placement_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการจัดวาง (Primary Key)',
+    equipment_id INT NOT NULL COMMENT 'รหัสครุภัณฑ์ (Foreign Key)',
+    equipment_code VARCHAR(50) NOT NULL COMMENT 'รหัสครุภัณฑ์สำหรับอ้างอิง',
+    school_name VARCHAR(255) NOT NULL COMMENT 'ชื่อโรงเรียนที่ตั้ง',
+    building_name VARCHAR(255) NOT NULL COMMENT 'ชื่ออาคารที่ตั้ง',
+    floor_level VARCHAR(100) NOT NULL COMMENT 'ชั้นที่ตั้ง',
+    room_number VARCHAR(100) NOT NULL COMMENT 'หมายเลขห้อง',
+    room_name VARCHAR(255) COMMENT 'ชื่อห้อง',
+    equipment_quantity INT NOT NULL DEFAULT 1 COMMENT 'จำนวนครุภัณฑ์ในห้อง',
+    installation_date DATE COMMENT 'วันที่ติดตั้ง',
+    placement_notes TEXT COMMENT 'หมายเหตุการจัดวาง',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
+    FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE CASCADE COMMENT 'อ้างอิงตาราง equipment',
+    FOREIGN KEY (equipment_code) REFERENCES equipment(equipment_code) ON DELETE CASCADE COMMENT 'อ้างอิงตาราง equipment ด้วยรหัสครุภัณฑ์',
+    INDEX idx_equipment_id (equipment_id) COMMENT 'ดัชนีสำหรับค้นหาตามรหัสครุภัณฑ์',
+    INDEX idx_equipment_code (equipment_code) COMMENT 'ดัชนีสำหรับค้นหาตามรหัสอ้างอิงครุภัณฑ์',
+    INDEX idx_location (school_name, building_name, floor_level) COMMENT 'ดัชนีสำหรับค้นหาตามสถานที่ตั้ง',
+    INDEX idx_room (room_number, room_name) COMMENT 'ดัชนีสำหรับค้นหาตามห้อง',
+    INDEX idx_installation_date (installation_date) COMMENT 'ดัชนีสำหรับค้นหาตามวันที่ติดตั้ง'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

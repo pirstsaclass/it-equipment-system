@@ -11,7 +11,7 @@ if (isset($_GET['action'])) {
         if ($id == $_SESSION['user_id']) {
             $_SESSION['error'] = "ไม่สามารถลบบัญชีของตัวเองได้";
         } else {
-            $stmt = $db->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลผู้ใช้เรียบร้อยแล้ว";
         }
@@ -20,8 +20,7 @@ if (isset($_GET['action'])) {
     }
     
     if ($action == 'toggle_active' && $id) {
-        // Note: users table doesn't have is_active field, using role instead
-        $stmt = $db->prepare("UPDATE users SET role = CASE WHEN role = 'inactive' THEN 'user' ELSE 'inactive' END WHERE user_id = ?");
+        $stmt = $db->prepare("UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
         $stmt->execute([$id]);
         $_SESSION['success'] = "อัพเดทสถานะผู้ใช้เรียบร้อยแล้ว";
         header("Location: users.php");
@@ -40,12 +39,12 @@ if ($_POST) {
             $_SESSION['error'] = "ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว";
         } else {
             $hashed_password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $db->prepare("INSERT INTO users (username, password_hash, full_name, email_address, role) VALUES (?, ?, ?, ?, ?)");
+            $stmt = $db->prepare("INSERT INTO users (username, password, employee_id, full_name, role, is_active) VALUES (?, ?, ?, ?, ?, 1)");
             $stmt->execute([
                 $_POST['username'],
                 $hashed_password,
-                $_POST['full_name'],
-                $_POST['email_address'],
+                $_POST['employee_id'],               
+                $_POST['full_name'],                
                 $_POST['role']
             ]);
             $_SESSION['success'] = "เพิ่มข้อมูลผู้ใช้เรียบร้อยแล้ว";
@@ -55,51 +54,41 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_user'])) {
-        $update_data = [
-            $_POST['username'],
-            $_POST['full_name'],
-            $_POST['email_address'],
-            $_POST['role'],
-            $_POST['id']
-        ];
-        
         // Update password if provided
         if (!empty($_POST['password'])) {
             $hashed_password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE users SET username=?, password_hash=?, full_name=?, email_address=?, role=? WHERE user_id=?");
-            $update_data = [
+            $stmt = $db->prepare("UPDATE users SET username=?, password=?, employee_id=?, full_name=?, role=? WHERE id=?");
+            $stmt->execute([
                 $_POST['username'],
                 $hashed_password,
+                $_POST['employee_id'],
                 $_POST['full_name'],
-                $_POST['email_address'],
                 $_POST['role'],
                 $_POST['id']
-            ];
+            ]);
         } else {
-            $stmt = $db->prepare("UPDATE users SET username=?, full_name=?, email_address=?, role=? WHERE user_id=?");
+            $stmt = $db->prepare("UPDATE users SET username=?, employee_id=?, full_name=?, role=? WHERE id=?");
+            $stmt->execute([
+                $_POST['username'],
+                $_POST['employee_id'],
+                $_POST['full_name'],
+                $_POST['role'],
+                $_POST['id']
+            ]);
         }
         
-        $stmt->execute($update_data);
         $_SESSION['success'] = "แก้ไขข้อมูลผู้ใช้เรียบร้อยแล้ว";
         header("Location: users.php");
         exit();
     }
 }
 
-// Get users list - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูล
-$users_query = "SELECT u.* 
-    FROM users u 
-    ORDER BY u.username";
+// Get users list
+$users_query = "SELECT u.* FROM users u ORDER BY u.id";
 $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
-
-// Get employees for dropdown (optional - if you want to link users to employees)
-$employees = $db->query("SELECT * FROM employees ORDER BY first_name, last_name")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<?php 
-// Include sidebar
-include 'includes/sidebar.php';
-?>
+<?php include 'includes/sidebar.php'; ?>
 
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
     <?php include 'includes/navbar.php'; ?>
@@ -134,20 +123,24 @@ include 'includes/sidebar.php';
                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th>ชื่อผู้ใช้</th>
+                            <th>ลำดับ</th>
+                            <th>ชื่อผู้ใช้</th>                            
+                            <th>รหัสพนักงาน</th>
                             <th>ชื่อ-นามสกุล</th>
-                            <th>อีเมล</th>
                             <th>สิทธิ์การใช้งาน</th>
-                            <th>วันที่สร้าง</th>
+                            <th>สถานะ</th>
+                            <th>เข้าใช้ล่าสุด</th>
                             <th>จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
+                        <?php $counter = 1; ?>
                         <?php foreach($users_list as $user): ?>
                         <tr>
+                            <td><?php echo $counter++; ?></td>
                             <td><?php echo $user['username']; ?></td>
+                            <td><?php echo $user['employee_id']; ?></td>
                             <td><?php echo $user['full_name']; ?></td>
-                            <td><?php echo $user['email']; ?></td>
                             <td>
                                 <?php 
                                 $role_badge = [
@@ -169,16 +162,26 @@ include 'includes/sidebar.php';
                                     ?>
                                 </span>
                             </td>
-                            <td><?php echo date('d/m/Y', strtotime($user['created_at'])); ?></td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <?php if ($user['user_id'] != $_SESSION['user_id']): ?>
-                                    <a href="users.php?action=delete&id=<?php echo $user['user_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                <?php endif; ?>
+                                <span class="badge bg-<?php echo $user['is_active'] ? 'success' : 'secondary'; ?>">
+                                    <?php echo $user['is_active'] ? 'ใช้งาน' : 'ปิดใช้งาน'; ?>
+                                </span>
+                            </td>
+                            <td><?php echo $user['last_login'] ? date('d/m/Y H:i', strtotime($user['last_login'])) : 'ยังไม่เคยเข้าใช้'; ?></td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <?php if ($user['id'] != $_SESSION['id']): ?>
+                                        <a href="users.php?action=toggle_active&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-<?php echo $user['is_active'] ? 'warning' : 'success'; ?>" title="<?php echo $user['is_active'] ? 'ปิดใช้งาน' : 'เปิดใช้งาน'; ?>">
+                                            <i class="fas fa-<?php echo $user['is_active'] ? 'pause' : 'play'; ?>"></i>
+                                        </a>
+                                        <a href="users.php?action=delete&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -199,7 +202,7 @@ include 'includes/sidebar.php';
             </div>
             <form method="POST" id="userForm">
                 <div class="modal-body">
-                    <input type="hidden" name="id" id="user_id">
+                    <input type="hidden" name="id" id="id">
                     
                     <div class="mb-3">
                         <label class="form-label">ชื่อผู้ใช้ *</label>
@@ -213,20 +216,20 @@ include 'includes/sidebar.php';
                     </div>
                     
                     <div class="mb-3">
+                        <label class="form-label">รหัสพนักงาน *</label>
+                        <input type="text" class="form-control" name="employee_id" id="employee_id" required>
+                    </div>
+                    
+                    <div class="mb-3">
                         <label class="form-label">ชื่อ-นามสกุล *</label>
                         <input type="text" class="form-control" name="full_name" id="full_name" required>
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">อีเมล</label>
-                        <input type="email" class="form-control" name="email" id="email">
-                    </div>
-                    
-                    <div class="mb-3">
                         <label class="form-label">สิทธิ์การใช้งาน *</label>
                         <select class="form-control" name="role" id="role" required>
-                            <option value="user">ผู้ใช้งาน (User)</option>
                             <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+                            <option value="user">ผู้ใช้งาน (User)</option>
                             <option value="technician">ช่างซ่อม (Technician)</option>
                         </select>
                     </div>
@@ -243,7 +246,7 @@ include 'includes/sidebar.php';
 <script>
 function clearForm() {
     document.getElementById('userForm').reset();
-    document.getElementById('user_id').value = '';
+    document.getElementById('id').value = '';
     document.getElementById('userModalLabel').textContent = 'เพิ่มผู้ใช้';
     document.getElementById('submitBtn').name = 'add_user';
     document.getElementById('submitBtn').textContent = 'บันทึก';
@@ -255,11 +258,11 @@ function clearForm() {
 }
 
 function editUser(user) {
-    document.getElementById('user_id').value = user.user_id;
+    document.getElementById('id').value = user.id;
     document.getElementById('username').value = user.username;
     document.getElementById('password').value = '';
+    document.getElementById('employee_id').value = user.employee_id;
     document.getElementById('full_name').value = user.full_name;
-    document.getElementById('email').value = user.email || '';
     document.getElementById('role').value = user.role;
     
     document.getElementById('userModalLabel').textContent = 'แก้ไขข้อมูลผู้ใช้';
@@ -276,7 +279,13 @@ $(document).ready(function() {
     $('#dataTable').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
-        }
+        },
+        order: [[0, 'asc']], // เรียงตามคอลัมน์ลำดับ
+        columnDefs: [
+            { orderable: false, targets: [6] } // ปิดการเรียงลำดับคอลัมน์จัดการ (เปลี่ยนจาก 7 เป็น 6)
+        ],
+        pageLength: 25,
+        responsive: true
     });
 });
 </script>

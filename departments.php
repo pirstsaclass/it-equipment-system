@@ -6,8 +6,9 @@ if (isset($_GET['action'])) {
     $action = $_GET['action'];
     $id = isset($_GET['id']) ? $_GET['id'] : null;
     
-    if ($action == 'delete' && $id) {
-        // Check if department is used in equipment
+if ($action == 'delete' && $id) {
+    try {
+        // ลองตรวจสอบว่ามีการใช้งานแผนกหรือไม่ (หากมีคอลัมน์ department_id)
         $check_stmt = $db->prepare("SELECT COUNT(*) as count FROM equipment WHERE department_id = ?");
         $check_stmt->execute([$id]);
         $used_count = $check_stmt->fetch(PDO::FETCH_ASSOC)['count'];
@@ -15,20 +16,28 @@ if (isset($_GET['action'])) {
         if ($used_count > 0) {
             $_SESSION['error'] = "ไม่สามารถลบแผนกนี้ได้ เนื่องจากมีครุภัณฑ์ที่ใช้งานอยู่";
         } else {
-            $stmt = $db->prepare("DELETE FROM departments WHERE department_id = ?");
+            $stmt = $db->prepare("DELETE FROM departments WHERE id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลแผนกเรียบร้อยแล้ว";
         }
-        header("Location: departments.php");
-        exit();
+    } catch (PDOException $e) {
+        // หากไม่มีคอลัมน์ department_id ให้ลบได้เลย
+        $stmt = $db->prepare("DELETE FROM departments WHERE id = ?");
+        $stmt->execute([$id]);
+        $_SESSION['success'] = "ลบข้อมูลแผนกเรียบร้อยแล้ว";
     }
+    
+    header("Location: departments.php");
+    exit();
+}
 }
 
 if ($_POST) {
     if (isset($_POST['add_department'])) {
-        $stmt = $db->prepare("INSERT INTO departments (department_name, department_description) VALUES (?, ?)");
+        $stmt = $db->prepare("INSERT INTO departments (department_name, school_name, department_description) VALUES (?, ?, ?)");
         $stmt->execute([
             $_POST['name'],
+            $_POST['school_name'],
             $_POST['description']
         ]);
         $_SESSION['success'] = "เพิ่มข้อมูลแผนกเรียบร้อยแล้ว";
@@ -37,9 +46,10 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_department'])) {
-        $stmt = $db->prepare("UPDATE departments SET department_name=?, department_description=? WHERE department_id=?");
+        $stmt = $db->prepare("UPDATE departments SET department_name=?, school_name=?, department_description=? WHERE id=?");
         $stmt->execute([
             $_POST['name'],
+            $_POST['school_name'],
             $_POST['description'],
             $_POST['id']
         ]);
@@ -49,8 +59,8 @@ if ($_POST) {
     }
 }
 
-// Get departments list
-$departments_query = "SELECT * FROM departments ORDER BY department_name";
+// Get departments list - เรียงตามลำดับการเพิ่มข้อมูล (id)
+$departments_query = "SELECT * FROM departments ORDER BY id ASC";
 $departments_list = $db->query($departments_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -92,23 +102,26 @@ include 'includes/sidebar.php';
                 <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th>รหัสแผนก</th>
+                            <th>ลำดับ</th>
+                            <th>โรงเรียน</th>
                             <th>ชื่อแผนก</th>
                             <th>รายละเอียด</th>
                             <th>จัดการ</th>
                         </tr>
                     </thead>
                     <tbody>
+                        <?php $counter = 1; ?>
                         <?php foreach($departments_list as $department): ?>
                         <tr>
-                            <td><?php echo $department['department_id']; ?></td>
+                            <td><?php echo $counter++; ?></td>                            
+                            <td><?php echo $department['school_name']; ?></td>
                             <td><?php echo $department['department_name']; ?></td>
                             <td><?php echo $department['department_description']; ?></td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#departmentModal" onclick='editDepartment(<?php echo json_encode($department); ?>)'>
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <a href="departments.php?action=delete&id=<?php echo $department['department_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                <a href="departments.php?action=delete&id=<?php echo $department['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
                             </td>
@@ -131,11 +144,24 @@ include 'includes/sidebar.php';
             </div>
             <form method="POST" id="departmentForm">
                 <div class="modal-body">
-                    <input type="hidden" name="id" id="department_id">
+                    <input type="hidden" name="id" id="id">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">โรงเรียน *</label>
+                        <select class="form-control" name="school_name" id="school_name" required onchange="updateDepartmentOptions(this.value)">
+                            <option value="">-- เลือกโรงเรียน --</option>
+                            <option value="โรงเรียนวารีเชียงใหม่">โรงเรียนวารีเชียงใหม่ (VCS)</option>
+                            <option value="โรงเรียนอนุบาลวารีเชียงใหม่">โรงเรียนอนุบาลวารีเชียงใหม่ (VKS)</option>
+                            <option value="โรงเรียนนานาชาติวารีเชียงใหม่">โรงเรียนนานาชาติวารีเชียงใหม่ (VCIS)</option>
+                        </select>
+                    </div>
                     
                     <div class="mb-3">
                         <label class="form-label">ชื่อแผนก *</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="ชื่อแผนก" required>
+                        <select class="form-control" name="name" id="name" required>
+                            <option value="">-- เลือกโรงเรียนก่อน --</option>
+                        </select>
+                        <small class="text-muted">เลือกโรงเรียนก่อนเพื่อดูรายการแผนก</small>
                     </div>
                     
                     <div class="mb-3">
@@ -153,17 +179,71 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
+// ข้อมูลโรงเรียนและแผนกแบบคงที่
+const schoolData = {
+    "โรงเรียนวารีเชียงใหม่": [
+        "ฝ่ายบริหาร",
+        "แผนกอำนวยการ", 
+        "ฝ่ายวิชาการ",
+        "แผนกอนุบาล",
+        "ประถมศึกษา",
+        "มัธยมศึกษา",
+        "สนับสนุน",
+        "IT"
+    ],
+    "โรงเรียนอนุบาลวารีเชียงใหม่": [
+        "แผนกอำนวยการ",
+        "แผนกอนุบาล"
+    ],
+    "โรงเรียนนานาชาติวารีเชียงใหม่": [
+        "Administration",
+        "Kindergarten",
+        "Primary",
+        "Secondary", 
+        "Support",
+    ]
+};
+
+// ฟังก์ชันอัพเดท dropdown แผนก
+function updateDepartmentOptions(school) {
+    const nameSelect = document.getElementById('name');
+    
+    // ล้าง options เดิม
+    nameSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>';
+    
+    if (school && schoolData[school]) {
+        const departments = schoolData[school];
+        
+        departments.forEach(dept => {
+            const option = document.createElement('option');
+            option.value = dept;
+            option.textContent = dept;
+            nameSelect.appendChild(option);
+        });
+    } else {
+        nameSelect.innerHTML = '<option value="">-- เลือกโรงเรียนก่อน --</option>';
+    }
+}
+
 function clearForm() {
     document.getElementById('departmentForm').reset();
-    document.getElementById('department_id').value = '';
+    document.getElementById('id').value = '';
     document.getElementById('departmentModalLabel').textContent = 'เพิ่มแผนก';
     document.getElementById('submitBtn').name = 'add_department';
     document.getElementById('submitBtn').textContent = 'บันทึก';
+    
+    // รีเซ็ต dropdown ชื่อแผนก
+    document.getElementById('name').innerHTML = '<option value="">-- เลือกโรงเรียนก่อน --</option>';
 }
 
 function editDepartment(department) {
-    document.getElementById('department_id').value = department.department_id || '';
+    document.getElementById('id').value = department.id || '';
+    document.getElementById('school_name').value = department.school_name || '';
+    
+    // อัพเดท dropdown ชื่อแผนกตามโรงเรียนที่เลือก
+    updateDepartmentOptions(department.school_name);
     document.getElementById('name').value = department.department_name || '';
+    
     document.getElementById('description').value = department.department_description || '';
     
     document.getElementById('departmentModalLabel').textContent = 'แก้ไขข้อมูลแผนก';
@@ -176,9 +256,9 @@ $(document).ready(function() {
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
         },
-        order: [[1, 'asc']], // เรียงตามชื่อแผนก
+        order: [[0, 'desc']], // เรียงตามลำดับการเพิ่มข้อมูล (ล่าสุดอยู่บน)
         columnDefs: [
-            { orderable: false, targets: [3] } // ปิดการเรียงลำดับคอลัมน์จัดการ
+            { orderable: false, targets: [4] } // ปิดการเรียงลำดับคอลัมน์จัดการ
         ]
     });
 });

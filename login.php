@@ -21,13 +21,14 @@ if ($_POST) {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($user && password_verify($password, $user['password'])) {
+        // Store the user's unique ID from the database in the session for accurate identification
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
         
         // Update last login
-        $stmt = $db->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-        $stmt->execute([$user['id']]);
+        $stmt = $db->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");  // แก้ไขเป็น id
+        $stmt->execute([$user['id']]);  // แก้ไขเป็น id
         
         header("Location: index.php");
         exit();
@@ -42,7 +43,7 @@ if ($_POST) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เข้าสู่ระบบ - โรงเรียนวารีนานาชาติ</title>
+    <title>เข้าสู่ระบบ - ระบบบริหารจัดการอุปกรณ์ไอที</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -77,7 +78,7 @@ if ($_POST) {
                 <div class="login-container">
                     <div class="login-header">
                         <h2><i class="fas fa-laptop-code"></i> ระบบบริหารจัดการอุปกรณ์ไอที</h2>
-                        <p class="mb-0">โรงเรียนวารีนานาชาติ</p>
+                        <p class="mb-0">โรงเรียนวารีเชียงใหม่</p>
                     </div>
                     <div class="login-body">
                         <?php if (isset($error)): ?>

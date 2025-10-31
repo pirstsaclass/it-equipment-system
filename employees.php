@@ -60,14 +60,14 @@ if ($_POST) {
 }
 
 // Get employees list - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูล
-$employees_query = "SELECT e.*, d.department_name 
+$employees_query = "SELECT e.*, d.department_name, d.school_name 
     FROM employees e 
-    LEFT JOIN departments d ON e.department_id = d.department_id 
+    LEFT JOIN departments d ON e.department_id = d.id 
     ORDER BY e.first_name, e.last_name";
 $employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get departments from database
-$departments_query = "SELECT department_id, department_name FROM departments ORDER BY department_name";
+$departments_query = "SELECT id, department_name, school_name FROM departments ORDER BY school_name, department_name";
 $departments = $db->query($departments_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -111,6 +111,7 @@ include 'includes/sidebar.php';
                         <tr>
                             <th>รหัสพนักงาน</th>
                             <th>ชื่อ-สกุล</th>
+                            <th>โรงเรียน</th>
                             <th>แผนก</th>
                             <th>ตำแหน่ง</th>
                             <th>โทรศัพท์</th>
@@ -123,6 +124,12 @@ include 'includes/sidebar.php';
                         <tr>
                             <td><?php echo $employee['employee_code']; ?></td>
                             <td><?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?></td>
+                            <td><?php echo $employee['school_name']; ?>
+                                <?php if (!empty($employee['school_name'])): ?>                                   
+                                <?php else: ?>
+                                    <span>ไม่ได้ระบุ</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo $employee['department_name']; ?></td>
                             <td><?php echo $employee['position_name']; ?></td>
                             <td><?php echo $employee['phone_number']; ?></td>
@@ -165,10 +172,23 @@ include 'includes/sidebar.php';
                             <label class="form-label">แผนก</label>
                             <select class="form-control" name="department_id" id="department_id">
                                 <option value="">เลือกแผนก</option>
-                                <?php foreach($departments as $department): ?>
-                                <option value="<?php echo $department['department_id']; ?>">
-                                    <?php echo $department['department_name']; ?>
-                                </option>
+                                <?php 
+                                // จัดกลุ่มแผนกตามโรงเรียน
+                                $grouped_departments = [];
+                                foreach($departments as $dept) {
+                                    $school = $dept['school_name'] ?: 'ไม่มีโรงเรียน';
+                                    $grouped_departments[$school][] = $dept;
+                                }
+                                
+                                foreach($grouped_departments as $school => $school_departments): 
+                                ?>
+                                    <optgroup label="<?php echo $school; ?>">
+                                        <?php foreach($school_departments as $dept): ?>
+                                        <option value="<?php echo $dept['id']; ?>">
+                                            <?php echo $dept['department_name']; ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -238,7 +258,11 @@ $(document).ready(function() {
     $('#dataTable').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
-        }
+        },
+        order: [[0, 'asc']], // เรียงตามรหัสพนักงาน
+        columnDefs: [
+            { orderable: false, targets: [7] } // ปิดการเรียงลำดับคอลัมน์จัดการ
+        ]
     });
 });
 </script>
