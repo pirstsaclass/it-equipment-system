@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 // ตั้งค่าปีการศึกษาเริ่มต้น
 $current_year = date('Y') + 543; // แปลงเป็น พ.ศ.
 $selected_year = isset($_GET['year']) ? $_GET['year'] : $current_year;
-$selected_school = isset($_GET['school_name']) ? $_GET['school_name '] : '';
+$selected_school = isset($_GET['school']) ? $_GET['school'] : '';
 $selected_building = isset($_GET['building']) ? $_GET['building'] : '';
 
 // CRUD Operations for Floor Plans
@@ -13,23 +13,24 @@ if (isset($_GET['action'])) {
     $id = isset($_GET['id']) ? $_GET['id'] : null;
     
     if ($action == 'delete_plan' && $id) {
-        // Delete floor plan image
-        $stmt = $db->prepare("SELECT plan_image FROM building_floor_plans WHERE id = ?");
+        // Delete floor plan image - แก้ไขชื่อคอลัมน์เป็น id
+        $stmt = $db->prepare("SELECT floor_plan_image FROM building_floor_plans WHERE id = ?");
         $stmt->execute([$id]);
         $plan = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($plan && $plan['plan_image']) {
-            $image_path = 'uploads/floor_plans/' . $plan['plan_image'];
+        if ($plan && $plan['floor_plan_image']) {
+            $image_path = 'uploads/floor_plans/' . $plan['floor_plan_image'];
             if (file_exists($image_path)) {
                 unlink($image_path);
             }
         }
         
+        // แก้ไขชื่อคอลัมน์เป็น id
         $stmt = $db->prepare("DELETE FROM building_floor_plans WHERE id = ?");
         $stmt->execute([$id]);
         $_SESSION['success'] = "ลบแผนผังตารางห้องเรียบร้อยแล้ว";
         
-        header("Location: departments.php?year=" . $selected_year . "&school_name=" . $selected_school . "&building=" . $selected_building);
+        header("Location: buildingfloorplans.php?year=" . $selected_year . "&school=" . $selected_school . "&building=" . $selected_building);
         exit();
     }
 }
@@ -39,36 +40,37 @@ if ($_POST) {
         // Handle image upload
         $image_name = '';
         if (isset($_FILES['plan_image']) && $_FILES['plan_image']['error'] == 0) {
-            $image_name = uploadFloorPlanImage($_FILES['plan_image'], $_POST['school_name'], $_POST['building'], $_POST['academic_year']);
+            $image_name = uploadFloorPlanImage($_FILES['plan_image'], $_POST['school'], $_POST['building'], $_POST['academic_year']);
         }
         
         if ($image_name) {
-            // Check if plan already exists
-            $check_stmt = $db->prepare("SELECT id FROM building_floor_plans WHERE school = ? AND building = ? AND academic_year = ?");
-            $check_stmt->execute([$_POST['school_name'], $_POST['building'], $_POST['academic_year']]);
+            // Check if plan already exists - ใช้โครงสร้างคอลัมน์ใหม่
+            $check_stmt = $db->prepare("SELECT id FROM building_floor_plans WHERE school_name = ? AND building_name = ? AND academic_year = ?");
+            $check_stmt->execute([$_POST['school'], $_POST['building'], $_POST['academic_year']]);
             $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existing) {
-                // Update existing plan
-                $old_stmt = $db->prepare("SELECT plan_image FROM building_floor_plans WHERE id = ?");
+                // Update existing plan - ใช้โครงสร้างคอลัมน์ใหม่
+                $old_stmt = $db->prepare("SELECT floor_plan_image FROM building_floor_plans WHERE id = ?");
                 $old_stmt->execute([$existing['id']]);
                 $old_plan = $old_stmt->fetch(PDO::FETCH_ASSOC);
                 
-                if ($old_plan && $old_plan['plan_image']) {
-                    $old_image_path = 'uploads/floor_plans/' . $old_plan['plan_image'];
+                if ($old_plan && $old_plan['floor_plan_image']) {
+                    $old_image_path = 'uploads/floor_plans/' . $old_plan['floor_plan_image'];
                     if (file_exists($old_image_path)) {
                         unlink($old_image_path);
                     }
                 }
                 
-                $stmt = $db->prepare("UPDATE building_floor_plans SET plan_image = ?, description = ?, updated_at = NOW() WHERE id = ?");
+                // ใช้โครงสร้างคอลัมน์ใหม่
+                $stmt = $db->prepare("UPDATE building_floor_plans SET floor_plan_image = ?, plan_description = ?, updated_at = NOW() WHERE id = ?");
                 $stmt->execute([$image_name, $_POST['description'], $existing['id']]);
                 $_SESSION['success'] = "อัพเดทแผนผังตารางห้องเรียบร้อยแล้ว";
             } else {
-                // Insert new plan
-                $stmt = $db->prepare("INSERT INTO building_floor_plans (school_name, building, academic_year, plan_image, description) VALUES (?, ?, ?, ?, ?)");
+                // Insert new plan - ใช้โครงสร้างคอลัมน์ใหม่
+                $stmt = $db->prepare("INSERT INTO building_floor_plans (school_name, building_name, academic_year, floor_plan_image, plan_description) VALUES (?, ?, ?, ?, ?)");
                 $stmt->execute([
-                    $_POST['school_name'],
+                    $_POST['school'],
                     $_POST['building'],
                     $_POST['academic_year'],
                     $image_name,
@@ -80,13 +82,13 @@ if ($_POST) {
             $_SESSION['error'] = "กรุณาเลือกรูปภาพแผนผัง";
         }
         
-        header("Location: departments.php?year=" . $selected_year . "&school_name=" . $selected_school . "&building=" . $selected_building);
+        header("Location: buildingfloorplans.php?year=" . $selected_year . "&school=" . $selected_school . "&building=" . $selected_building);
         exit();
     }
 }
 
 // Function to handle floor plan image upload
-function uploadFloorPlanImage($file, $school_name, $building, $year) {
+function uploadFloorPlanImage($file, $school, $building, $year) {
     $upload_dir = 'uploads/floor_plans/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0777, true);
@@ -138,7 +140,7 @@ function uploadFloorPlanImage($file, $school_name, $building, $year) {
     }
 }
 
-// Get filter options from building_floor_plans table
+// Get filter options from building_floor_plans table - ใช้โครงสร้างคอลัมน์ใหม่
 $schools_query = "SELECT DISTINCT school_name FROM building_floor_plans ORDER BY school_name";
 $schools_result = $db->query($schools_query);
 $schools_list = $schools_result ? $schools_result->fetchAll(PDO::FETCH_COLUMN) : [];
@@ -154,13 +156,14 @@ if (empty($schools_list)) {
 
 $buildings_list = [];
 if ($selected_school) {
-    $buildings_query = "SELECT DISTINCT building FROM building_floor_plans WHERE school = ? ORDER BY building";
+    // ใช้โครงสร้างคอลัมน์ใหม่
+    $buildings_query = "SELECT DISTINCT building_name FROM building_floor_plans WHERE school_name = ? ORDER BY building_name";
     $buildings_stmt = $db->prepare($buildings_query);
     $buildings_stmt->execute([$selected_school]);
     $buildings_list = $buildings_stmt->fetchAll(PDO::FETCH_COLUMN);
 }
 
-// Get unique academic years
+// Get unique academic years - ใช้โครงสร้างคอลัมน์ใหม่
 $years_query = "SELECT DISTINCT academic_year FROM building_floor_plans ORDER BY academic_year DESC";
 $years_result = $db->query($years_query);
 $years_list = $years_result ? $years_result->fetchAll(PDO::FETCH_COLUMN) : [];
@@ -169,10 +172,10 @@ if (empty($years_list)) {
     $years_list = [$current_year];
 }
 
-// Get floor plan for selected filters
+// Get floor plan for selected filters - ใช้โครงสร้างคอลัมน์ใหม่
 $floor_plan = null;
 if ($selected_school && $selected_building && $selected_year) {
-    $plan_stmt = $db->prepare("SELECT * FROM building_floor_plans WHERE school = ? AND building = ? AND academic_year = ?");
+    $plan_stmt = $db->prepare("SELECT * FROM building_floor_plans WHERE school_name = ? AND building_name = ? AND academic_year = ?");
     $plan_stmt->execute([$selected_school, $selected_building, $selected_year]);
     $floor_plan = $plan_stmt->fetch(PDO::FETCH_ASSOC);
 }
@@ -293,7 +296,8 @@ if ($selected_school && $selected_building && $selected_year) {
                 <div class="row">
                     <div class="col-12">
                         <div class="position-relative">
-                            <img src="uploads/floor_plans/<?php echo $floor_plan['plan_image']; ?>" 
+                            <!-- ใช้โครงสร้างคอลัมน์ใหม่ floor_plan_image -->
+                            <img src="uploads/floor_plans/<?php echo $floor_plan['floor_plan_image']; ?>" 
                                  class="img-fluid rounded shadow" 
                                  alt="แผนผังตารางห้อง"
                                  style="max-width: 100%; height: auto;">
@@ -305,7 +309,8 @@ if ($selected_school && $selected_building && $selected_year) {
                                             onclick='editPlan(<?php echo json_encode($floor_plan); ?>)'>
                                         <i class="fas fa-edit"></i> แก้ไข
                                     </button>
-                                    <a href="departments.php?action=delete_plan&id=<?php echo $floor_plan['id']; ?>&year=<?php echo $selected_year; ?>&school=<?php echo $selected_school; ?>&building=<?php echo $selected_building; ?>" 
+                                    <!-- ใช้โครงสร้างคอลัมน์ใหม่ id -->
+                                    <a href="buildingfloorplans.php?action=delete_plan&id=<?php echo $floor_plan['id']; ?>&year=<?php echo $selected_year; ?>&school=<?php echo $selected_school; ?>&building=<?php echo $selected_building; ?>" 
                                        class="btn btn-danger btn-sm" 
                                        onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบแผนผังนี้?')">
                                         <i class="fas fa-trash"></i> ลบ
@@ -314,9 +319,10 @@ if ($selected_school && $selected_building && $selected_year) {
                             </div>
                         </div>
                         
-                        <?php if (!empty($floor_plan['description'])): ?>
+                        <!-- ใช้โครงสร้างคอลัมน์ใหม่ plan_description -->
+                        <?php if (!empty($floor_plan['plan_description'])): ?>
                             <div class="alert alert-info mt-3">
-                                <i class="fas fa-info-circle"></i> <strong>หมายเหตุ:</strong> <?php echo nl2br(htmlspecialchars($floor_plan['description'])); ?>
+                                <i class="fas fa-info-circle"></i> <strong>หมายเหตุ:</strong> <?php echo nl2br(htmlspecialchars($floor_plan['plan_description'])); ?>
                             </div>
                         <?php endif; ?>
                         
@@ -440,7 +446,6 @@ const schoolData = {
     }
 };
 
-
 // Update building dropdown based on selected school
 document.getElementById('plan_school').addEventListener('change', function() {
     const school = this.value;
@@ -523,22 +528,22 @@ function clearPlanForm() {
 }
 
 function editPlan(plan) {
-    document.getElementById('plan_id').value = plan.id;
-    document.getElementById('plan_school').value = plan.school;
+    document.getElementById('plan_id').value = plan.id; // เปลี่ยนเป็น id
+    document.getElementById('plan_school').value = plan.school_name;
     document.getElementById('plan_school').dispatchEvent(new Event('change'));
     
     setTimeout(() => {
-        document.getElementById('plan_building').value = plan.building;
+        document.getElementById('plan_building').value = plan.building_name;
     }, 100);
     
     document.getElementById('plan_year').value = plan.academic_year;
-    document.getElementById('plan_description').value = plan.description || '';
+    document.getElementById('plan_description').value = plan.plan_description || '';
     
-    // Show existing image
+    // Show existing image - ใช้โครงสร้างคอลัมน์ใหม่ floor_plan_image
     const previewRow = document.getElementById('planImagePreviewRow');
     const preview = document.getElementById('planImagePreview');
-    if (plan.plan_image) {
-        preview.innerHTML = `<img src="uploads/floor_plans/${plan.plan_image}" class="img-fluid rounded shadow" style="max-height: 300px;" alt="Current Image">
+    if (plan.floor_plan_image) {
+        preview.innerHTML = `<img src="uploads/floor_plans/${plan.floor_plan_image}" class="img-fluid rounded shadow" style="max-height: 300px;" alt="Current Image">
                             <div class="text-muted small mt-2">ภาพปัจจุบัน (เลือกไฟล์ใหม่เพื่อเปลี่ยน)</div>`;
         previewRow.style.display = 'block';
     }

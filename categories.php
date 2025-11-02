@@ -20,7 +20,7 @@ if (isset($_GET['action'])) {
             $delete_subcategories_stmt->execute([$id]);
             
             // Then delete category
-            $stmt = $db->prepare("DELETE FROM equipment_categories WHERE category_id = ?");
+            $stmt = $db->prepare("DELETE FROM equipment_categories WHERE id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลหมวดหมู่และรายการย่อยเรียบร้อยแล้ว";
         }
@@ -37,7 +37,7 @@ if (isset($_GET['action'])) {
         if ($used_count > 0) {
             $_SESSION['error'] = "ไม่สามารถลบหมวดหมู่ย่อยนี้ได้ เนื่องจากมีครุภัณฑ์ที่ใช้งานอยู่";
         } else {
-            $stmt = $db->prepare("DELETE FROM equipment_subcategories WHERE subcategory_id = ?");
+            $stmt = $db->prepare("DELETE FROM equipment_subcategories WHERE id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลหมวดหมู่ย่อยเรียบร้อยแล้ว";
         }
@@ -61,7 +61,7 @@ if ($_POST) {
                 // Edit existing category
                 $category_id = $_POST['category_id'];
                 
-                $stmt = $db->prepare("UPDATE equipment_categories SET category_name=?, category_description=? WHERE category_id=?");
+                $stmt = $db->prepare("UPDATE equipment_categories SET category_name=?, category_description=? WHERE id=?");
                 $stmt->execute([$category_name, $category_description, $category_id]);
                 
                 // Update existing subcategories and add new subcategories
@@ -69,7 +69,7 @@ if ($_POST) {
                     if (!empty($subcategory['name'])) {
                         if (isset($subcategory['id']) && !empty($subcategory['id'])) {
                             // Update existing subcategory
-                            $stmt = $db->prepare("UPDATE equipment_subcategories SET subcategory_name=?, subcategory_description=? WHERE subcategory_id=? AND category_id=?");
+                            $stmt = $db->prepare("UPDATE equipment_subcategories SET subcategory_name=?, subcategory_description=? WHERE id=? AND category_id=?");
                             $stmt->execute([$subcategory['name'], $subcategory['description'] ?? '', $subcategory['id'], $category_id]);
                         } else {
                             // Add new subcategory
@@ -110,23 +110,23 @@ if ($_POST) {
     }
 }
 
-// Get categories list with subcategory counts
+// Get categories list with subcategory counts - FIXED QUERY
 $categories_query = "
-    SELECT ec.*, COUNT(es.subcategory_id) as subcategory_count 
+    SELECT ec.*, COUNT(es.id) as subcategory_count 
     FROM equipment_categories ec 
-    LEFT JOIN equipment_subcategories es ON ec.category_id = es.category_id
-    GROUP BY ec.category_id 
+    LEFT JOIN equipment_subcategories es ON ec.id = es.category_id
+    GROUP BY ec.id 
     ORDER BY ec.category_name";
 $categories_list = $db->query($categories_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get subcategories for selected category
-$selected_category_id = isset($_GET['category_id']) ? $_GET['category_id'] : ($categories_list[0]['category_id'] ?? null);
+$selected_category_id = isset($_GET['category_id']) ? $_GET['category_id'] : ($categories_list[0]['id'] ?? null);
 $selected_category = null;
 $subcategories = [];
 
 if ($selected_category_id) {
     // Get category details
-    $stmt = $db->prepare("SELECT * FROM equipment_categories WHERE category_id = ?");
+    $stmt = $db->prepare("SELECT * FROM equipment_categories WHERE id = ?");
     $stmt->execute([$selected_category_id]);
     $selected_category = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -134,7 +134,7 @@ if ($selected_category_id) {
     $subcategories_query = "
         SELECT es.*, ec.category_name
         FROM equipment_subcategories es 
-        JOIN equipment_categories ec ON es.category_id = ec.category_id 
+        JOIN equipment_categories ec ON es.category_id = ec.id 
         WHERE es.category_id = ? 
         ORDER BY es.subcategory_name";
     $stmt = $db->prepare($subcategories_query);
@@ -147,13 +147,13 @@ $edit_mode = isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET[
 $edit_category = null;
 
 if ($edit_mode) {
-    $stmt = $db->prepare("SELECT * FROM equipment_categories WHERE category_id = ?");
+    $stmt = $db->prepare("SELECT * FROM equipment_categories WHERE id = ?");
     $stmt->execute([$_GET['id']]);
     $edit_category = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Get subcategories for edit category
     $subcategories_stmt = $db->prepare("SELECT * FROM equipment_subcategories WHERE category_id = ? ORDER BY subcategory_name");
-    $subcategories_stmt->execute([$edit_category['category_id']]);
+    $subcategories_stmt->execute([$edit_category['id']]);
     $subcategories = $subcategories_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
@@ -201,7 +201,7 @@ include 'includes/sidebar.php';
             </div>
             <div class="card-body">
                 <form method="POST" id="categoryForm">
-                    <input type="hidden" name="category_id" value="<?php echo $edit_category['category_id']; ?>">
+                    <input type="hidden" name="category_id" value="<?php echo $edit_category['id']; ?>">
                     
                     <div class="row mb-4">
                         <div class="col-md-12">
@@ -246,7 +246,7 @@ include 'includes/sidebar.php';
                                         <tr>
                                             <td class="text-center"><?php echo $index + 1; ?></td>
                                             <td>
-                                                <input type="hidden" name="subcategories[<?php echo $index; ?>][id]" value="<?php echo $subcategory['subcategory_id']; ?>">
+                                                <input type="hidden" name="subcategories[<?php echo $index; ?>][id]" value="<?php echo $subcategory['id']; ?>">
                                                 <input type="text" class="form-control" name="subcategories[<?php echo $index; ?>][name]" 
                                                        value="<?php echo $subcategory['subcategory_name']; ?>" required
                                                        placeholder="เช่น เครื่องคอมพิวเตอร์ตั้งโต๊ะ">
@@ -298,8 +298,8 @@ include 'includes/sidebar.php';
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
                             <?php foreach($categories_list as $category): ?>
-                            <a href="categories.php?category_id=<?php echo $category['category_id']; ?>" 
-                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center <?php echo $selected_category_id == $category['category_id'] ? 'active' : ''; ?>">
+                            <a href="categories.php?category_id=<?php echo $category['id']; ?>" 
+                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center <?php echo $selected_category_id == $category['id'] ? 'active' : ''; ?>">
                                 <div>
                                     <strong><?php echo $category['category_name']; ?></strong>
                                     <?php if ($category['category_description']): ?>
@@ -324,10 +324,10 @@ include 'includes/sidebar.php';
                                 หมวดหมู่ย่อย - <?php echo $selected_category['category_name'] ?? 'ไม่พบหมวดหมู่' ?>
                             </h6>
                             <div>
-                                <a href="categories.php?action=edit&id=<?php echo $selected_category['category_id']; ?>" class="btn btn-warning btn-sm">
+                                <a href="categories.php?action=edit&id=<?php echo $selected_category['id']; ?>" class="btn btn-warning btn-sm">
                                     <i class="fas fa-edit me-1"></i> แก้ไข
                                 </a>
-                                <a href="categories.php?action=delete_category&id=<?php echo $selected_category['category_id']; ?>" 
+                                <a href="categories.php?action=delete_category&id=<?php echo $selected_category['id']; ?>" 
                                    class="btn btn-danger btn-sm" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบหมวดหมู่นี้? การลบจะทำให้หมวดหมู่ย่อยทั้งหมดถูกลบด้วย')">
                                     <i class="fas fa-trash me-1"></i> ลบ
                                 </a>
@@ -358,7 +358,7 @@ include 'includes/sidebar.php';
                                                 <td class="fw-bold"><?php echo $subcategory['subcategory_name']; ?></td>
                                                 <td><?php echo $subcategory['subcategory_description'] ?: '-'; ?></td>
                                                 <td class="text-center">
-                                                    <a href="categories.php?action=delete_subcategory&id=<?php echo $subcategory['subcategory_id']; ?>&category_id=<?php echo $selected_category_id; ?>" 
+                                                    <a href="categories.php?action=delete_subcategory&id=<?php echo $subcategory['id']; ?>&category_id=<?php echo $selected_category_id; ?>" 
                                                        class="btn btn-danger btn-sm" title="ลบ" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                                         <i class="fas fa-trash"></i>
                                                     </a>

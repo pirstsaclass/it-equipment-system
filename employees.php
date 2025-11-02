@@ -6,7 +6,7 @@ if (isset($_GET['action'])) {
     $action = $_GET['action'];
     $id = isset($_GET['id']) ? $_GET['id'] : null;
     
-    if ($action == 'delete' && $id) {
+    if ($action == 'delete' && $id) { 
         // Check if employee is used in users table
         $check_stmt = $db->prepare("SELECT COUNT(*) as count FROM users WHERE employee_id = ?");
         $check_stmt->execute([$id]);
@@ -15,7 +15,7 @@ if (isset($_GET['action'])) {
         if ($used_count > 0) {
             $_SESSION['error'] = "ไม่สามารถลบพนักงานนี้ได้ เนื่องจากมีบัญชีผู้ใช้ที่ใช้งานอยู่";
         } else {
-            $stmt = $db->prepare("DELETE FROM employees WHERE employee_id = ?");
+            $stmt = $db->prepare("DELETE FROM employees WHERE id = ?");
             $stmt->execute([$id]);
             $_SESSION['success'] = "ลบข้อมูลพนักงานเรียบร้อยแล้ว";
         }
@@ -42,7 +42,7 @@ if ($_POST) {
     }
     
     if (isset($_POST['edit_employee'])) {
-        $stmt = $db->prepare("UPDATE employees SET employee_code=?, first_name=?, last_name=?, department_id=?, position_name=?, phone_number=?, email_address=? WHERE employee_id=?");
+        $stmt = $db->prepare("UPDATE employees SET employee_code=?, first_name=?, last_name=?, department_id=?, position_name=?, phone_number=?, email_address=? WHERE id=?");
         $stmt->execute([
             $_POST['employee_code'],
             $_POST['first_name'],
@@ -59,15 +59,15 @@ if ($_POST) {
     }
 }
 
-// Get employees list - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูล
+// Get employees list - แก้ไข query ให้ตรงกับโครงสร้างฐานข้อมูลใหม่
 $employees_query = "SELECT e.*, d.department_name, d.school_name 
     FROM employees e 
     LEFT JOIN departments d ON e.department_id = d.id 
     ORDER BY e.first_name, e.last_name";
 $employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Get departments from database
-$departments_query = "SELECT id, department_name, school_name FROM departments ORDER BY school_name, department_name";
+// Get departments from database - แก้ไขตามโครงสร้างใหม่
+$departments_query = "SELECT id, school_name, department_name FROM departments ORDER BY school_name, department_name";
 $departments = $db->query($departments_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -124,13 +124,20 @@ include 'includes/sidebar.php';
                         <tr>
                             <td><?php echo $employee['employee_code']; ?></td>
                             <td><?php echo $employee['first_name'] . ' ' . $employee['last_name']; ?></td>
-                            <td><?php echo $employee['school_name']; ?>
-                                <?php if (!empty($employee['school_name'])): ?>                                   
+                            <td>
+                                <?php if (!empty($employee['school_name'])): ?>
+                                    <?php echo $employee['school_name']; ?>
                                 <?php else: ?>
-                                    <span>ไม่ได้ระบุ</span>
+                                    <span class="text-muted">ไม่ได้ระบุ</span>
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo $employee['department_name']; ?></td>
+                            <td>
+                                <?php if (!empty($employee['department_name'])): ?>
+                                    <?php echo $employee['department_name']; ?>
+                                <?php else: ?>
+                                    <span class="text-muted">ไม่ได้ระบุ</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo $employee['position_name']; ?></td>
                             <td><?php echo $employee['phone_number']; ?></td>
                             <td><?php echo $employee['email_address']; ?></td>
@@ -138,7 +145,7 @@ include 'includes/sidebar.php';
                                 <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeModal" onclick='editEmployee(<?php echo json_encode($employee); ?>)'>
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <a href="employees.php?action=delete&id=<?php echo $employee['employee_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                <a href="employees.php?action=delete&id=<?php echo $employee['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
                             </td>
@@ -173,7 +180,7 @@ include 'includes/sidebar.php';
                             <select class="form-control" name="department_id" id="department_id">
                                 <option value="">เลือกแผนก</option>
                                 <?php 
-                                // จัดกลุ่มแผนกตามโรงเรียน
+                                // จัดกลุ่มแผนกตามโรงเรียน - ตามโครงสร้างใหม่
                                 $grouped_departments = [];
                                 foreach($departments as $dept) {
                                     $school = $dept['school_name'] ?: 'ไม่มีโรงเรียน';
@@ -182,10 +189,10 @@ include 'includes/sidebar.php';
                                 
                                 foreach($grouped_departments as $school => $school_departments): 
                                 ?>
-                                    <optgroup label="<?php echo $school; ?>">
+                                    <optgroup label="<?php echo htmlspecialchars($school); ?>">
                                         <?php foreach($school_departments as $dept): ?>
                                         <option value="<?php echo $dept['id']; ?>">
-                                            <?php echo $dept['department_name']; ?>
+                                            <?php echo htmlspecialchars($dept['department_name']); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </optgroup>
@@ -240,7 +247,7 @@ function clearForm() {
 }
 
 function editEmployee(employee) {
-    document.getElementById('employee_id').value = employee.employee_id;
+    document.getElementById('employee_id').value = employee.id;
     document.getElementById('employee_code').value = employee.employee_code;
     document.getElementById('first_name').value = employee.first_name;
     document.getElementById('last_name').value = employee.last_name;

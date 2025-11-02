@@ -1,5 +1,13 @@
 <?php
+// เริ่ม session และ error reporting
 require_once 'includes/header.php';
+
+// ตรวจสอบสิทธิ์การเข้าถึง
+if (!isset($_SESSION['role']) || ($_SESSION['role'] != 'admin' && $_SESSION['role'] != 'teacher')) {
+    $_SESSION['error'] = "คุณไม่มีสิทธิ์เข้าถึงหน้านี้";
+    header('Location: index.php');
+    exit;
+}
 
 // CRUD Operations
 if (isset($_GET['action'])) {
@@ -7,21 +15,25 @@ if (isset($_GET['action'])) {
     $id = isset($_GET['id']) ? $_GET['id'] : null;
     
     if ($action == 'delete' && $id) {
-        // Delete image file if exists
-        $stmt = $db->prepare("SELECT image_path FROM equipment WHERE equipment_id = ?");
-        $stmt->execute([$id]);
-        $equipment = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($equipment && $equipment['image_path']) {
-            $image_path = 'uploads/img_equipment/' . $equipment['image_path'];
-            if (file_exists($image_path)) {
-                unlink($image_path);
+        try {
+            // Delete image file if exists
+            $stmt = $db->prepare("SELECT image_path FROM equipment WHERE id = ?");
+            $stmt->execute([$id]);
+            $equipment = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($equipment && $equipment['image_path']) {
+                $image_path = 'uploads/img_equipment/' . $equipment['image_path'];
+                if (file_exists($image_path)) {
+                    unlink($image_path);
+                }
             }
+            
+            $stmt = $db->prepare("DELETE FROM equipment WHERE id = ?");
+            $stmt->execute([$id]);
+            $_SESSION['success'] = "ลบข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
+        } catch (PDOException $e) {
+            $_SESSION['error'] = "เกิดข้อผิดพลาดในการลบข้อมูล: " . $e->getMessage();
         }
-        
-        $stmt = $db->prepare("DELETE FROM equipment WHERE equipment_id = ?");
-        $stmt->execute([$id]);
-        $_SESSION['success'] = "ลบข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
         header("Location: equipment.php");
         exit();
     }
@@ -29,73 +41,77 @@ if (isset($_GET['action'])) {
 
 if ($_POST) {
     if (isset($_POST['add_equipment'])) {
-        // Handle image upload
-        $image_filename = null;
-        if (isset($_FILES['equipment_image']) && $_FILES['equipment_image']['error'] == 0) {
-            $upload_dir = 'uploads/img_equipment/';
-            if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
-            }
-            
-            $equipment_code = $_POST['equipment_code'];
-            $equipment_name = $_POST['equipment_name'];
-            
-            $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
-            $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
-            
-            $file_extension = strtolower(pathinfo($_FILES['equipment_image']['name'], PATHINFO_EXTENSION));
-            $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
-            $image_path = $upload_dir . $file_name;
-            
-            $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-            if (in_array($file_extension, $allowed_extensions)) {
-                if ($_FILES['equipment_image']['size'] <= 5 * 1024 * 1024) {
-                    if (move_uploaded_file($_FILES['equipment_image']['tmp_name'], $image_path)) {
-                        $image_filename = $file_name;
+        try {
+            // Handle image upload
+            $image_filename = null;
+            if (isset($_FILES['equipment_image']) && $_FILES['equipment_image']['error'] == 0) {
+                $upload_dir = 'uploads/img_equipment/';
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0777, true);
+                }
+                
+                $equipment_code = $_POST['equipment_code'];
+                $equipment_name = $_POST['equipment_name'];
+                
+                $clean_equipment_name = preg_replace('/[^a-zA-Z0-9ก-๙_\-\s]/u', '', $equipment_name);
+                $clean_equipment_name = str_replace(' ', '_', $clean_equipment_name);
+                
+                $file_extension = strtolower(pathinfo($_FILES['equipment_image']['name'], PATHINFO_EXTENSION));
+                $file_name = $equipment_code . '_' . $clean_equipment_name . '.' . $file_extension;
+                $image_path = $upload_dir . $file_name;
+                
+                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                if (in_array($file_extension, $allowed_extensions)) {
+                    if ($_FILES['equipment_image']['size'] <= 5 * 1024 * 1024) {
+                        if (move_uploaded_file($_FILES['equipment_image']['tmp_name'], $image_path)) {
+                            $image_filename = $file_name;
+                        } else {
+                            $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัพโหลดไฟล์";
+                        }
                     } else {
-                        $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัพโหลดไฟล์";
+                        $_SESSION['error'] = "ขนาดไฟล์ต้องไม่เกิน 5MB";
                     }
                 } else {
-                    $_SESSION['error'] = "ขนาดไฟล์ต้องไม่เกิน 5MB";
+                    $_SESSION['error'] = "รองรับเฉพาะไฟล์รูปภาพ (JPG, JPEG, PNG, GIF, WEBP)";
                 }
-            } else {
-                $_SESSION['error'] = "รองรับเฉพาะไฟล์รูปภาพ (JPG, JPEG, PNG, GIF, WEBP)";
             }
-        }
-        
-        if (!isset($_SESSION['error'])) {
-            $stmt = $db->prepare("INSERT INTO equipment (equipment_code, equipment_name, category_id, subcategory_id, brand_name, model_name, serial_number, purchase_date, warranty_expiry_date, purchase_price, supplier_name, equipment_status, location_school, location_building, location_floor, location_room, responsible_person, notes, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
-                $_POST['equipment_code'],
-                $_POST['equipment_name'],
-                $_POST['category_id'],
-                $_POST['subcategory_id'],
-                $_POST['brand_name'],
-                $_POST['model_name'],
-                $_POST['serial_number'],
-                $_POST['purchase_date'],
-                $_POST['warranty_expiry_date'],
-                $_POST['purchase_price'],
-                $_POST['supplier_name'],
-                $_POST['equipment_status'],
-                $_POST['location_school'],
-                $_POST['location_building'],
-                $_POST['location_floor'],
-                $_POST['location_room'],
-                $_POST['responsible_person'],
-                $_POST['notes'],
-                $image_filename
-            ]);
-            $_SESSION['success'] = "เพิ่มข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
-            header("Location: equipment.php");
-            exit();
+            
+            if (!isset($_SESSION['error'])) {
+                $stmt = $db->prepare("INSERT INTO equipment (equipment_code, equipment_name, category_id, subcategory_id, brand_name, model_name, serial_number, purchase_date, warranty_expiry_date, purchase_price, supplier_name, equipment_status, location_school, location_building, location_floor, location_room, responsible_person, notes, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $_POST['equipment_code'],
+                    $_POST['equipment_name'],
+                    $_POST['category_id'],
+                    $_POST['subcategory_id'],
+                    $_POST['brand_name'],
+                    $_POST['model_name'],
+                    $_POST['serial_number'],
+                    $_POST['purchase_date'],
+                    $_POST['warranty_expiry_date'],
+                    $_POST['purchase_price'],
+                    $_POST['supplier_name'],
+                    $_POST['equipment_status'],
+                    $_POST['location_school'],
+                    $_POST['location_building'],
+                    $_POST['location_floor'],
+                    $_POST['location_room'],
+                    $_POST['responsible_person'],
+                    $_POST['notes'],
+                    $image_filename
+                ]);
+                $_SESSION['success'] = "เพิ่มข้อมูลครุภัณฑ์เรียบร้อยแล้ว";
+                header("Location: equipment.php");
+                exit();
+            }
+        } catch (PDOException $e) {
+            $_SESSION['error'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล: " . $e->getMessage();
         }
     }
     
     if (isset($_POST['edit_equipment'])) {
         try {
             // Get old status before update
-            $old_equipment_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE equipment_id = ?");
+            $old_equipment_status_stmt = $db->prepare("SELECT equipment_status FROM equipment WHERE id = ?");
             $old_equipment_status_stmt->execute([$_POST['equipment_id']]);
             $old_equipment_status = $old_equipment_status_stmt->fetchColumn();
             
@@ -146,7 +162,7 @@ if ($_POST) {
             
             if (!isset($_SESSION['error'])) {
                 // Update equipment
-                $stmt = $db->prepare("UPDATE equipment SET equipment_code=?, equipment_name=?, category_id=?, subcategory_id=?, brand_name=?, model_name=?, serial_number=?, purchase_date=?, warranty_expiry_date=?, purchase_price=?, supplier_name=?, equipment_status=?, location_school=?, location_building=?, location_floor=?, location_room=?, responsible_person=?, notes=?, image_path=? WHERE equipment_id=?");
+                $stmt = $db->prepare("UPDATE equipment SET equipment_code=?, equipment_name=?, category_id=?, subcategory_id=?, brand_name=?, model_name=?, serial_number=?, purchase_date=?, warranty_expiry_date=?, purchase_price=?, supplier_name=?, equipment_status=?, location_school=?, location_building=?, location_floor=?, location_room=?, responsible_person=?, notes=?, image_path=? WHERE id=?");
                 $stmt->execute([
                     $_POST['equipment_code'],
                     $_POST['equipment_name'],
@@ -208,40 +224,64 @@ if (!empty($where_conditions)) {
 }
 
 // นับจำนวนข้อมูลทั้งหมดสำหรับ pagination
-$count_query = "SELECT COUNT(*) as total FROM equipment e 
-    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
-    $where_clause";
-$count_stmt = $db->prepare($count_query);
-$count_stmt->execute($params);
-$total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+try {
+    // แก้ไข JOIN ตามโครงสร้างฐานข้อมูลใหม่
+    $count_query = "SELECT COUNT(*) as total FROM equipment e 
+        LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+        LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
+        $where_clause";
+    $count_stmt = $db->prepare($count_query);
+    $count_stmt->execute($params);
+    $total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+} catch (PDOException $e) {
+    $total_records = 0;
+    $_SESSION['error'] = "เกิดข้อผิดพลาดในการนับข้อมูล: " . $e->getMessage();
+}
 
 // ตั้งค่า pagination
 $total_pages = ceil($total_records / $records_per_page);
 $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($current_page - 1) * $records_per_page;
 
-// Get equipment list with pagination and search - แก้ไข query ใช้ maintenance_requests
-$equipment_query = "SELECT e.*, ec.category_name, es.subcategory_name,
-                           (SELECT mr.repair_status FROM maintenance_requests mr 
-                            WHERE mr.equipment_id = e.equipment_id 
-                            ORDER BY mr.created_at DESC 
-                            LIMIT 1) as repair_status
-                    FROM equipment e 
-                    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-                    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
-                    $where_clause 
-                    ORDER BY e.created_at DESC 
-                    LIMIT $offset, $records_per_page";
+// Get equipment list with pagination and search
+try {
+    // แก้ไข JOIN ตามโครงสร้างฐานข้อมูลใหม่
+    $equipment_query = "SELECT e.*, ec.category_name, es.subcategory_name,
+                               (SELECT mr.repair_status FROM maintenance_requests mr 
+                                WHERE mr.equipment_id = e.id 
+                                ORDER BY mr.created_at DESC 
+                                LIMIT 1) as repair_status
+                        FROM equipment e 
+                        LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+                        LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
+                        $where_clause 
+                        ORDER BY e.created_at DESC 
+                        LIMIT $offset, $records_per_page";
 
-$stmt = $db->prepare($equipment_query);
-$stmt->execute($params);
-$equipment_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $db->prepare($equipment_query);
+    $stmt->execute($params);
+    $equipment_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $equipment_list = [];
+    $_SESSION['error'] = "เกิดข้อผิดพลาดในการโหลดข้อมูล: " . $e->getMessage();
+}
 
 // Get categories for dropdown
-$categories = $db->query("SELECT * FROM equipment_categories ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $categories = $db->query("SELECT * FROM equipment_categories ORDER BY category_name")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $categories = [];
+    $_SESSION['error'] = "เกิดข้อผิดพลาดในการโหลดหมวดหมู่: " . $e->getMessage();
+}
 
-// สร้าง URL สำหรับ pagination
+// Get all subcategories for JavaScript
+try {
+    $subcategories_all = $db->query("SELECT * FROM equipment_subcategories ORDER BY subcategory_name")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $subcategories_all = [];
+}
+
+// สร้าง URL สำหรับ pagination (ต้องประกาศก่อนใช้งาน)
 function getPageUrl($page, $search, $filter_equipment_status, $per_page) {
     $params = ['page' => $page];
     if (!empty($search)) {
@@ -272,16 +312,16 @@ include 'includes/sidebar.php';
         </button>
     </div>
 
-    <?php if (isset($_SESSION['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+    <?php if (isset($_SESSION['error'])): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
 
-    <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+    <?php if (isset($_SESSION['success'])): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
@@ -384,10 +424,10 @@ include 'includes/sidebar.php';
                                 <td class="fw-bold text-primary"><?php echo $equipment['equipment_code']; ?></td>
                                 <td><?php echo $equipment['equipment_name']; ?></td>
                                 <td>
-                                    <span class="badge bg-secondary"><?php echo $equipment['category_name']; ?></span>
+                                    <span class="badge bg-secondary"><?php echo $equipment['category_name'] ?? '-'; ?></span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-dark"><?php echo $equipment['subcategory_name']; ?></span>
+                                    <span class="badge bg-light text-dark"><?php echo $equipment['subcategory_name'] ?? '-'; ?></span>
                                 </td>
                                 <td>
                                     <?php 
@@ -399,8 +439,9 @@ include 'includes/sidebar.php';
                                         'ซ่อมเสร็จแล้ว' => 'success',
                                         'จำหน่ายแล้ว' => 'danger'
                                     ];
+                                    $status_class = $equipment_status_badge[$equipment['equipment_status']] ?? 'secondary';
                                     ?>
-                                    <span class="badge bg-<?php echo $equipment_status_badge[$equipment['equipment_status']] ?? 'secondary'; ?>">
+                                    <span class="badge bg-<?php echo $status_class; ?>">
                                         <?php echo $equipment['equipment_status']; ?>
                                     </span>
                                 </td>
@@ -436,7 +477,7 @@ include 'includes/sidebar.php';
                                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick='editEquipment(<?php echo json_encode($equipment); ?>)' title="แก้ไข">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <a href="equipment.php?action=delete&id=<?php echo $equipment['equipment_id']; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?><?php echo !empty($filter_equipment_status) ? '&equipment_status='.$filter_equipment_status : ''; ?><?php echo ($records_per_page != 20) ? '&per_page='.$records_per_page : ''; ?><?php echo ($current_page > 1) ? '&page='.$current_page : ''; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
+                                        <a href="equipment.php?action=delete&id=<?php echo $equipment['id']; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?><?php echo !empty($filter_equipment_status) ? '&equipment_status='.$filter_equipment_status : ''; ?><?php echo ($records_per_page != 20) ? '&per_page='.$records_per_page : ''; ?><?php echo ($current_page > 1) ? '&page='.$current_page : ''; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -557,7 +598,7 @@ include 'includes/sidebar.php';
                                     <select class="form-control" name="category_id" id="category_id" required onchange="loadSubcategories(this.value)">
                                         <option value="">เลือกหมวดหมู่หลัก</option>
                                         <?php foreach($categories as $category): ?>
-                                        <option value="<?php echo $category['category_id']; ?>">
+                                        <option value="<?php echo $category['id']; ?>">
                                             <?php echo $category['category_name']; ?>
                                         </option>
                                         <?php endforeach; ?>
@@ -626,21 +667,31 @@ include 'includes/sidebar.php';
                                 </div>
                             </div>
                             
+                            <!-- ข้อมูลตำแหน่งที่ตั้ง - แก้ไขให้ใช้ dropdown -->
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">โรงเรียน</label>
-                                    <input type="text" class="form-control" name="location_school" id="location_school">
+                                    <label class="form-label">โรงเรียน *</label>
+                                    <select class="form-control" name="location_school" id="location_school" required onchange="loadBuildings(this.value)">
+                                        <option value="">เลือกโรงเรียน</option>
+                                        <option value="โรงเรียนวารีเชียงใหม่">โรงเรียนวารีเชียงใหม่</option>
+                                        <option value="โรงเรียนอนุบาลวารีเชียงใหม่">โรงเรียนอนุบาลวารีเชียงใหม่</option>
+                                        <option value="โรงเรียนนานาชาติวารีเชียงใหม่">โรงเรียนนานาชาติวารีเชียงใหม่</option>
+                                    </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">ตึก/อาคาร</label>
-                                    <input type="text" class="form-control" name="location_building" id="location_building">
+                                    <label class="form-label">ตึก/อาคาร *</label>
+                                    <select class="form-control" name="location_building" id="location_building" required onchange="loadFloors(this.value)">
+                                        <option value="">เลือกตึก/อาคาร</option>
+                                    </select>
                                 </div>
                             </div>
                             
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">ชั้น</label>
-                                    <input type="text" class="form-control" name="location_floor" id="location_floor">
+                                    <label class="form-label">ชั้น *</label>
+                                    <select class="form-control" name="location_floor" id="location_floor" required>
+                                        <option value="">เลือกชั้น</option>
+                                    </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">ห้อง</label>
@@ -698,6 +749,38 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
+// ข้อมูลโรงเรียน ตึก และชั้น
+const schoolData = {
+    "โรงเรียนวารีเชียงใหม่": {
+        buildings: [
+            { name: "อาคาร1-อำนวยการ", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "อาคาร3-ประถม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4"] },
+            { name: "อาคาร4-ประถม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3"] },
+            { name: "อาคาร4-มัธยม", floors: ["ชั้น 3", "ชั้น 4", "ชั้น 5"] },
+            { name: "อาคาร5-อนุบาล", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "อาคาร6-??", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "อาคาร7-มัธยม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4", "ชั้น 5", "ชั้น 6", "ชั้น 7"] },
+            { name: "อาคาร 10", floors: ["ชั้น 1", "ชั้น 2"] }
+        ]
+    },
+    "โรงเรียนอนุบาลวารีเชียงใหม่": {
+        buildings: [
+            { name: "อาคาร 1-อำนวยการ", floors: ["ชั้น 1", "ชั้น 2"] },
+            { name: "อาคาร-อนุบาล", floors: ["ชั้น 1", "ชั้น 2"] }
+        ]
+    },
+    "โรงเรียนนานาชาติวารีเชียงใหม่": {
+        buildings: [
+            { name: "อาคาร 8", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4"] },
+            { name: "อาคาร 9", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3"] },
+            { name: "อาคาร 10", floors: ["ชั้น 1", "ชั้น 2"] }
+        ]
+    }
+};
+
+// เก็บข้อมูลหมวดหมู่ย่อยทั้งหมดจาก PHP
+const allSubcategories = <?php echo json_encode($subcategories_all); ?>;
+
 function clearForm() {
     document.getElementById('equipmentForm').reset();
     document.getElementById('equipment_id').value = '';
@@ -707,6 +790,8 @@ function clearForm() {
     document.getElementById('imagePreview').style.display = 'none';
     document.getElementById('noImagePlaceholder').style.display = 'block';
     document.getElementById('subcategory_id').innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
+    document.getElementById('location_building').innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
+    document.getElementById('location_floor').innerHTML = '<option value="">เลือกชั้น</option>';
 }
 
 function editEquipment(equipment) {
@@ -714,7 +799,7 @@ function editEquipment(equipment) {
     document.getElementById('submitButton').name = 'edit_equipment';
     
     // เติมข้อมูลในฟอร์ม
-    document.getElementById('equipment_id').value = equipment.equipment_id;
+    document.getElementById('equipment_id').value = equipment.id;
     document.getElementById('equipment_code').value = equipment.equipment_code;
     document.getElementById('equipment_name').value = equipment.equipment_name;
     document.getElementById('category_id').value = equipment.category_id;
@@ -727,8 +812,6 @@ function editEquipment(equipment) {
     document.getElementById('supplier_name').value = equipment.supplier_name || '';
     document.getElementById('equipment_status').value = equipment.equipment_status;
     document.getElementById('location_school').value = equipment.location_school || '';
-    document.getElementById('location_building').value = equipment.location_building || '';
-    document.getElementById('location_floor').value = equipment.location_floor || '';
     document.getElementById('location_room').value = equipment.location_room || '';
     document.getElementById('responsible_person').value = equipment.responsible_person || '';
     document.getElementById('notes').value = equipment.notes || '';
@@ -737,6 +820,11 @@ function editEquipment(equipment) {
     // โหลดหมวดหมู่ย่อย
     if (equipment.category_id) {
         loadSubcategories(equipment.category_id, equipment.subcategory_id);
+    }
+    
+    // โหลดข้อมูลตึกและชั้น (ถ้ามีข้อมูลโรงเรียน)
+    if (equipment.location_school) {
+        loadBuildings(equipment.location_school, equipment.location_building, equipment.location_floor);
     }
     
     // แสดงรูปภาพ
@@ -756,23 +844,78 @@ function loadSubcategories(categoryId, selectedSubcategoryId = null) {
         return;
     }
     
-    fetch('get_subcategories.php?category_id=' + categoryId)
-        .then(response => response.json())
-        .then(data => {
-            const subcategorySelect = document.getElementById('subcategory_id');
-            subcategorySelect.innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
-            
-            data.forEach(subcategory => {
-                const option = document.createElement('option');
-                option.value = subcategory.subcategory_id;
-                option.textContent = subcategory.subcategory_name;
-                if (selectedSubcategoryId && subcategory.subcategory_id == selectedSubcategoryId) {
-                    option.selected = true;
-                }
-                subcategorySelect.appendChild(option);
-            });
-        })
-        .catch(error => console.error('Error:', error));
+    const subcategorySelect = document.getElementById('subcategory_id');
+    subcategorySelect.innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
+    
+    // กรองหมวดหมู่ย่อยตาม category_id
+    const filteredSubcategories = allSubcategories.filter(sub => sub.category_id == categoryId);
+    
+    filteredSubcategories.forEach(subcategory => {
+        const option = document.createElement('option');
+        option.value = subcategory.id;
+        option.textContent = subcategory.subcategory_name;
+        if (selectedSubcategoryId && subcategory.id == selectedSubcategoryId) {
+            option.selected = true;
+        }
+        subcategorySelect.appendChild(option);
+    });
+}
+
+function loadBuildings(schoolName, selectedBuilding = null, selectedFloor = null) {
+    const buildingSelect = document.getElementById('location_building');
+    const floorSelect = document.getElementById('location_floor');
+    
+    // รีเซ็ต dropdown
+    buildingSelect.innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
+    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
+    
+    if (!schoolName || !schoolData[schoolName]) {
+        return;
+    }
+    
+    // เติมข้อมูลตึก/อาคาร
+    schoolData[schoolName].buildings.forEach(building => {
+        const option = document.createElement('option');
+        option.value = building.name;
+        option.textContent = building.name;
+        if (selectedBuilding && building.name === selectedBuilding) {
+            option.selected = true;
+        }
+        buildingSelect.appendChild(option);
+    });
+    
+    // ถ้ามีการเลือกตึกอยู่แล้ว ให้โหลดชั้นด้วย
+    if (selectedBuilding) {
+        loadFloors(selectedBuilding, selectedFloor);
+    }
+}
+
+function loadFloors(buildingName, selectedFloor = null) {
+    const floorSelect = document.getElementById('location_floor');
+    const schoolSelect = document.getElementById('location_school');
+    const schoolName = schoolSelect.value;
+    
+    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
+    
+    if (!schoolName || !buildingName || !schoolData[schoolName]) {
+        return;
+    }
+    
+    // หาข้อมูลตึกที่เลือก
+    const building = schoolData[schoolName].buildings.find(b => b.name === buildingName);
+    
+    if (building) {
+        // เติมข้อมูลชั้น
+        building.floors.forEach(floor => {
+            const option = document.createElement('option');
+            option.value = floor;
+            option.textContent = floor;
+            if (selectedFloor && floor === selectedFloor) {
+                option.selected = true;
+            }
+            floorSelect.appendChild(option);
+        });
+    }
 }
 
 function previewImage(event) {
@@ -846,8 +989,8 @@ function viewEquipment(equipment) {
             <div class="col-md-6">
                 <h6 class="fw-bold">ข้อมูลเพิ่มเติม</h6>
                 <table class="table table-sm">
-                    <tr><td width="40%"><strong>วันที่สร้าง:</strong></td><td>${new Date(equipment.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td></tr>
-                    <tr><td><strong>วันที่แก้ไขล่าสุด:</strong></td><td>${new Date(equipment.updated_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td></tr>
+                    <tr><td width="40%"><strong>วันที่สร้าง:</strong></td><td>${equipment.created_at ? new Date(equipment.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td></tr>
+                    <tr><td><strong>วันที่แก้ไขล่าสุด:</strong></td><td>${equipment.updated_at ? new Date(equipment.updated_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td></tr>
                     <tr><td><strong>หมายเหตุ:</strong></td><td>${equipment.notes || '-'}</td></tr>
                 </table>
             </div>

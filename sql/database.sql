@@ -19,16 +19,19 @@ CREATE TABLE IF NOT EXISTS users (
 -- ตาราง departments (แผนก)
 CREATE TABLE IF NOT EXISTS departments (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสแผนก (Primary Key)',
+    school_name VARCHAR(100) NOT NULL COMMENT 'ชื่อโรงเรียน',
     department_name VARCHAR(100) NOT NULL COMMENT 'ชื่อแผนก',
     department_description TEXT COMMENT 'รายละเอียดแผนก',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
+    INDEX idx_school_name (school_name),
     INDEX idx_department_name (department_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ตาราง employees (พนักงาน)
 CREATE TABLE IF NOT EXISTS employees (
-    employee_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสพนักงาน (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสพนักงาน (Primary Key)',
     employee_code VARCHAR(20) UNIQUE COMMENT 'รหัสพนักงานสำหรับอ้างอิง',
     first_name VARCHAR(50) NOT NULL COMMENT 'ชื่อพนักงาน',
     last_name VARCHAR(50) NOT NULL COMMENT 'นามสกุลพนักงาน',
@@ -38,7 +41,7 @@ CREATE TABLE IF NOT EXISTS employees (
     phone_number VARCHAR(20) COMMENT 'เบอร์โทรศัพท์พนักงาน',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
-    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
     INDEX idx_employee_code (employee_code),
     INDEX idx_department_id (department_id),
     INDEX idx_employee_name (first_name, last_name)
@@ -46,7 +49,7 @@ CREATE TABLE IF NOT EXISTS employees (
 
 -- ตาราง equipment_categories (หมวดหมู่ครุภัณฑ์)
 CREATE TABLE IF NOT EXISTS equipment_categories (
-    category_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสหมวดหมู่ (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสหมวดหมู่ (Primary Key)',
     category_name VARCHAR(100) NOT NULL COMMENT 'ชื่อหมวดหมู่ครุภัณฑ์',
     category_description TEXT COMMENT 'รายละเอียดหมวดหมู่',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
@@ -56,20 +59,20 @@ CREATE TABLE IF NOT EXISTS equipment_categories (
 
 -- ตาราง equipment_subcategories (รายการย่อยของหมวดหมู่)
 CREATE TABLE IF NOT EXISTS equipment_subcategories (
-    subcategory_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสหมวดหมู่ย่อย (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสหมวดหมู่ย่อย (Primary Key)',
     category_id INT NOT NULL COMMENT 'รหัสหมวดหมู่หลัก (Foreign Key)',
     subcategory_name VARCHAR(100) NOT NULL COMMENT 'ชื่อหมวดหมู่ย่อย',
     subcategory_description TEXT COMMENT 'รายละเอียดหมวดหมู่ย่อย',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
-    FOREIGN KEY (category_id) REFERENCES equipment_categories(category_id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES equipment_categories(id) ON DELETE CASCADE,
     INDEX idx_category_id (category_id),
     INDEX idx_subcategory_name (subcategory_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ตาราง equipment (ครุภัณฑ์)
 CREATE TABLE IF NOT EXISTS equipment (
-    equipment_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสครุภัณฑ์ (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสครุภัณฑ์ (Primary Key)',
     equipment_code VARCHAR(50) NOT NULL UNIQUE COMMENT 'รหัสครุภัณฑ์สำหรับอ้างอิง',
     equipment_name VARCHAR(200) NOT NULL COMMENT 'ชื่อครุภัณฑ์',
     category_id INT COMMENT 'รหัสหมวดหมู่หลัก (Foreign Key)',
@@ -91,8 +94,8 @@ CREATE TABLE IF NOT EXISTS equipment (
     image_path VARCHAR(255) COMMENT 'เส้นทางเก็บรูปภาพ',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
-    FOREIGN KEY (category_id) REFERENCES equipment_categories(category_id) ON DELETE SET NULL,
-    FOREIGN KEY (subcategory_id) REFERENCES equipment_subcategories(subcategory_id) ON DELETE SET NULL,
+    FOREIGN KEY (category_id) REFERENCES equipment_categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (subcategory_id) REFERENCES equipment_subcategories(id) ON DELETE SET NULL,
     INDEX idx_equipment_code (equipment_code),
     INDEX idx_category_id (category_id),
     INDEX idx_equipment_status (equipment_status),
@@ -102,7 +105,7 @@ CREATE TABLE IF NOT EXISTS equipment (
 
 -- ตาราง maintenance_requests (การแจ้งซ่อม)
 CREATE TABLE IF NOT EXISTS maintenance_requests (
-    maintenance_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการซ่อม (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการซ่อม (Primary Key)',
     repair_code VARCHAR(20) NOT NULL UNIQUE COMMENT 'รหัสใบแจ้งซ่อม',
     equipment_id INT NOT NULL COMMENT 'รหัสครุภัณฑ์ (Foreign Key)',
     report_date DATE NOT NULL COMMENT 'วันที่แจ้งซ่อม',
@@ -119,7 +122,7 @@ CREATE TABLE IF NOT EXISTS maintenance_requests (
     location_room VARCHAR(100) COMMENT 'ห้องที่ตั้งครุภัณฑ์',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่แก้ไขล่าสุด',
-    FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE CASCADE,
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
     INDEX idx_repair_code (repair_code),
     INDEX idx_equipment_id (equipment_id),
     INDEX idx_repair_status (repair_status),
@@ -129,21 +132,21 @@ CREATE TABLE IF NOT EXISTS maintenance_requests (
 
 -- ตาราง maintenance_logs (บันทึกการซ่อมบำรุง)
 CREATE TABLE IF NOT EXISTS maintenance_logs (
-    log_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสบันทึก (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสบันทึก (Primary Key)',
     maintenance_id INT NOT NULL COMMENT 'รหัสการซ่อม (Foreign Key)',
     previous_status VARCHAR(50) COMMENT 'สถานะก่อนหน้า',
     new_status VARCHAR(50) COMMENT 'สถานะใหม่',
     changed_by_user VARCHAR(100) COMMENT 'ผู้ใช้งานที่เปลี่ยนแปลงสถานะ',
     action_notes TEXT COMMENT 'หมายเหตุการดำเนินการ',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
-    FOREIGN KEY (maintenance_id) REFERENCES maintenance_requests(maintenance_id) ON DELETE CASCADE,
+    FOREIGN KEY (maintenance_id) REFERENCES maintenance_requests(id) ON DELETE CASCADE,
     INDEX idx_maintenance_id (maintenance_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ตาราง equipment_transfers (การโอนย้ายครุภัณฑ์)
 CREATE TABLE IF NOT EXISTS equipment_transfers (
-    transfer_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการโอนย้าย (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการโอนย้าย (Primary Key)',
     equipment_id INT NOT NULL COMMENT 'รหัสครุภัณฑ์ (Foreign Key)',
     from_school VARCHAR(200) COMMENT 'โรงเรียนเดิม',
     from_building VARCHAR(100) COMMENT 'ตึกเดิม',
@@ -157,14 +160,14 @@ CREATE TABLE IF NOT EXISTS equipment_transfers (
     transferred_by VARCHAR(100) COMMENT 'ผู้ดำเนินการโอนย้าย',
     transfer_reason TEXT COMMENT 'เหตุผลในการโอนย้าย',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
-    FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE CASCADE,
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
     INDEX idx_equipment_id (equipment_id),
     INDEX idx_transfer_date (transfer_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ตาราง equipment_disposals (การจำหน่ายครุภัณฑ์)
 CREATE TABLE IF NOT EXISTS equipment_disposals (
-    disposal_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการจำหน่าย (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการจำหน่าย (Primary Key)',
     equipment_id INT NOT NULL COMMENT 'รหัสครุภัณฑ์ (Foreign Key)',
     disposal_date DATE NOT NULL COMMENT 'วันที่จำหน่าย',
     disposal_method VARCHAR(100) COMMENT 'วิธีการจำหน่าย',
@@ -173,7 +176,7 @@ CREATE TABLE IF NOT EXISTS equipment_disposals (
     approved_by VARCHAR(100) COMMENT 'ผู้อนุมัติการจำหน่าย',
     disposal_notes TEXT COMMENT 'หมายเหตุการจำหน่าย',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
-    FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id) ON DELETE CASCADE,
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
     INDEX idx_equipment_id (equipment_id),
     INDEX idx_disposal_date (disposal_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -196,7 +199,7 @@ CREATE TABLE IF NOT EXISTS building_floor_plans (
 
 -- ตาราง equipment_classroom (การจัดวางครุภัณฑ์ในห้องเรียน)
 CREATE TABLE IF NOT EXISTS equipment_classroom (
-    placement_id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการจัดวาง (Primary Key)',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสการจัดวาง (Primary Key)',
     equipment_code VARCHAR(50) NOT NULL COMMENT 'รหัสครุภัณฑ์สำหรับอ้างอิง',
     school_name VARCHAR(255) NOT NULL COMMENT 'ชื่อโรงเรียนที่ตั้ง',
     building_name VARCHAR(255) NOT NULL COMMENT 'ชื่ออาคารที่ตั้ง',
@@ -214,22 +217,32 @@ CREATE TABLE IF NOT EXISTS equipment_classroom (
 
 -- ข้อมูลตัวอย่าง
 
-INSERT INTO users (id, username, password, employee_id, full_name, role, is_active, last_login, created_at,updated_at) VALUES
-(1, 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 6501005,'jukkrit', 'admin', 1, '2025-10-28 05:37:00', '2025-10-27 03:02:41','2025-10-30 03:02:41');
 
+-- เพิ่มผู้ใช้งานระบบ
 
--- เพิ่ม admin user (password: admin123)
-INSERT INTO users (username, password, full_name, email, user_role) VALUES
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ผู้ดูแลระบบ', 'admin@varee.ac.th', 'admin');
+INSERT INTO users (username, password, employee_id, full_name, role, is_active, last_login, created_at, updated_at) VALUES
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '6501005', 'jukkrit', 'admin', 1, '2025-10-31 09:52:16', '2025-10-26 20:02:41', '2025-10-31 09:52:16'),
+('moss', '$2y$10$HzzC.TvfQ4bNKUkqaSH8fe.GTa40FEOvHvOjdWwvJfgk26Rc5HK3.', '6501008', 'mosss', 'admin', 1, '2025-10-31 07:00:18', '2025-10-31 05:56:11', '2025-10-31 07:00:18'),
+('test3', '$2y$10$GVrzPjNNuHlqLKeh.xJYDeN6No6Q9rF8TTdlz5zGkv6pQZ.ecQNCW', '6541321', 'moss', 'technician', 1, '2025-10-31 06:46:31', '2025-10-31 06:13:01', '2025-10-31 06:46:31');
+
 
 -- เพิ่มแผนก
-INSERT INTO departments (department_name, department_description) VALUES
-('อำนวยการ', 'ฝ่ายอำนวยการ'),
-('อนุบาล', 'แผนกอนุบาล'),
-('ประถมศึกษา', 'แผนกประถมศึกษา'),
-('มัธยมศึกษา', 'แผนกมัธยมศึกษา'),
-('สนับสนุน', 'ฝ่ายสนับสนุน'),
-('IT', 'ฝ่ายเทคโนโลยีสารสนเทศ');
+INSERT INTO departments (school_name, department_name, department_description, created_at, updated_at) VALUES
+('โรงเรียนวารีเชียงใหม่', 'ฝ่ายบริหาร', '', '2025-10-31 09:25:27', '2025-10-31 09:26:02'),
+('โรงเรียนวารีเชียงใหม่', 'แผนกอำนวยการ', '', '2025-10-31 09:26:08', '2025-10-31 09:26:08'),
+( 'โรงเรียนวารีเชียงใหม่', 'ฝ่ายวิชาการ', '', '2025-10-31 09:26:12', '2025-10-31 09:26:12'),
+( 'โรงเรียนวารีเชียงใหม่', 'แผนกอนุบาล', '', '2025-10-31 09:26:20', '2025-10-31 09:26:20'),
+( 'โรงเรียนวารีเชียงใหม่', 'ประถมศึกษา', '', '2025-10-31 09:26:26', '2025-10-31 09:26:26'),
+( 'โรงเรียนวารีเชียงใหม่', 'มัธยมศึกษา', '', '2025-10-31 09:26:31', '2025-10-31 09:26:31'),
+( 'โรงเรียนวารีเชียงใหม่', 'สนับสนุน', '', '2025-10-31 09:26:39', '2025-10-31 09:26:39'),
+('โรงเรียนวารีเชียงใหม่', 'IT', '', '2025-10-31 09:26:44', '2025-10-31 09:26:44'),
+( 'โรงเรียนอนุบาลวารีเชียงใหม่', 'แผนกอำนวยการ', '', '2025-10-31 09:26:50', '2025-10-31 09:26:50'),
+( 'โรงเรียนอนุบาลวารีเชียงใหม่', 'แผนกอนุบาล', '', '2025-10-31 09:26:59', '2025-10-31 09:26:59'),
+( 'โรงเรียนนานาชาติวารีเชียงใหม่', 'Administration', '', '2025-10-31 09:30:43', '2025-10-31 09:30:43'),
+( 'โรงเรียนนานาชาติวารีเชียงใหม่', 'Kindergarten', '', '2025-10-31 09:30:48', '2025-10-31 09:30:48'),
+( 'โรงเรียนนานาชาติวารีเชียงใหม่', 'Primary', '', '2025-10-31 09:30:57', '2025-10-31 09:30:57'),
+('โรงเรียนนานาชาติวารีเชียงใหม่', 'Secondary', '', '2025-10-31 09:31:06', '2025-10-31 09:31:06'),
+('โรงเรียนนานาชาติวารีเชียงใหม่', 'Support', '', '2025-10-31 09:31:19', '2025-10-31 09:31:19');
 
 -- เพิ่มหมวดหมู่ครุภัณฑ์
 INSERT INTO equipment_categories (category_name, category_description) VALUES
@@ -265,11 +278,11 @@ INSERT INTO equipment_subcategories (category_id, subcategory_name, subcategory_
 (5, 'ชั้นวางหนังสือ', 'Bookshelf');
 
 -- เพิ่มพนักงานตัวอย่าง
-INSERT INTO employees (employee_code, first_name, last_name, department_id, position_name, email_address, phone_number) VALUES
-('EMP001', 'สมชาย', 'ใจดี', 6, 'ช่างคอมพิวเตอร์', 'somchai@varee.ac.th', '081-111-1111'),
-('EMP002', 'สมหญิง', 'รักงาน', 6, 'เจ้าหน้าที่ IT', 'somying@varee.ac.th', '081-222-2222'),
-('EMP003', 'วิชัย', 'มั่นคง', 5, 'เจ้าหน้าที่บริหาร', 'wichai@varee.ac.th', '081-333-3333');
 
+INSERT INTO employees (employee_code, first_name, last_name, department_id, position_name, email_address, phone_number) VALUES
+('EMP001', 'สมชาย', 'ใจดี', 1, 'ช่างคอมพิวเตอร์', 'somchai@varee.ac.th', '081-111-1111'),
+('EMP002', 'สมหญิง', 'รักงาน', 1, 'เจ้าหน้าที่ IT', 'somying@varee.ac.th', '081-222-2222'),
+('EMP003', 'วิชัย', 'มั่นคง', 2, 'เจ้าหน้าที่บริหาร', 'wichai@varee.ac.th', '081-333-3333');
 -- เพิ่มครุภัณฑ์ตัวอย่าง
 INSERT INTO equipment (equipment_code, equipment_name, category_id, subcategory_id, brand_name, model_name, serial_number, purchase_date, warranty_expiry_date, purchase_price, equipment_status, location_school, location_building, location_floor, location_room, responsible_person) VALUES
 ('VCS-COM-001', 'เครื่องคอมพิวเตอร์', 1, 1, 'Dell', 'OptiPlex 7090', 'SN001234567', '2024-01-15', '2027-01-15', 25000.00, 'ใหม่', 'โรงเรียนวารีเชียงใหม่', 'ตึก1-อำนวยการ', 'ชั้น 1', 'ห้องธุรการ', 'คุณสมชาย'),

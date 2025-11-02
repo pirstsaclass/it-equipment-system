@@ -7,7 +7,7 @@ if (isset($_GET['action'])) {
     $id = isset($_GET['id']) ? $_GET['id'] : null;
     
     if ($action == 'delete' && $id) {
-        $stmt = $db->prepare("DELETE FROM maintenance_requests WHERE maintenance_id = ?");
+        $stmt = $db->prepare("DELETE FROM maintenance_requests WHERE id = ?");
         $stmt->execute([$id]);
         $_SESSION['success'] = "ลบข้อมูลการซ่อมเรียบร้อยแล้ว";
         header("Location: maintenance.php");
@@ -46,7 +46,7 @@ if ($_POST) {
             // Update equipment status based on maintenance status
             if ($repair_status == 'ซ่อมเสร็จ') {
                 $new_equipment_status = 'ใช้งานปกติ';
-                $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE equipment_id = ?");
+                $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE id = ?");
                 $update_stmt->execute([$new_equipment_status, $equipment_id]);
             } else {
                 // สำหรับสถานะอื่นๆ
@@ -64,7 +64,7 @@ if ($_POST) {
                 }
                 
                 if ($new_equipment_status) {
-                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE equipment_id = ?");
+                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE id = ?");
                     $update_stmt->execute([$new_equipment_status, $equipment_id]);
                 }
             }
@@ -86,12 +86,12 @@ if ($_POST) {
             $new_repair_status = $_POST['repair_status'];
             
             // Get old status before update
-            $old_repair_status_stmt = $db->prepare("SELECT repair_status FROM maintenance_requests WHERE maintenance_id = ?");
+            $old_repair_status_stmt = $db->prepare("SELECT repair_status FROM maintenance_requests WHERE id = ?");
             $old_repair_status_stmt->execute([$_POST['maintenance_id']]);
             $old_repair_status = $old_repair_status_stmt->fetchColumn();
 
             // Update maintenance record
-            $stmt = $db->prepare("UPDATE maintenance_requests SET report_date=?, problem_description=?, reported_by=?, assigned_technician=?, repair_status=?, solution_description=?, repair_cost=?, completed_date=?, location_school=?, location_building=?, location_floor=?, location_room=? WHERE maintenance_id=?");
+            $stmt = $db->prepare("UPDATE maintenance_requests SET report_date=?, problem_description=?, reported_by=?, assigned_technician=?, repair_status=?, solution_description=?, repair_cost=?, completed_date=?, location_school=?, location_building=?, location_floor=?, location_room=? WHERE id=?");
             $stmt->execute([
                 $_POST['report_date'],
                 $_POST['problem_description'],
@@ -129,7 +129,7 @@ if ($_POST) {
                 }
                 
                 if ($new_equipment_status) {
-                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE equipment_id = ?");
+                    $update_stmt = $db->prepare("UPDATE equipment SET equipment_status = ? WHERE id = ?");
                     $update_stmt->execute([$new_equipment_status, $equipment_id]);
                 }
             }
@@ -146,37 +146,37 @@ if ($_POST) {
     }
 }
 
-// Get maintenance list with equipment data
+// Get maintenance list with equipment data - แก้ไข JOIN ให้ตรงกับโครงสร้างฐานข้อมูล
 $maintenance_query = "SELECT mr.*, e.equipment_code, e.equipment_name, e.equipment_status,
                              ec.category_name, es.subcategory_name
                       FROM maintenance_requests mr 
-                      JOIN equipment e ON mr.equipment_id = e.equipment_id 
-                      LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-                      LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+                      JOIN equipment e ON mr.equipment_id = e.id 
+                      LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+                      LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
                       ORDER BY mr.created_at DESC";
 $maintenance_list = $db->query($maintenance_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // Get equipment for dropdown
-$equipment_list = $db->query("SELECT equipment_id, equipment_code, equipment_name, equipment_status, 
+$equipment_list = $db->query("SELECT id, equipment_code, equipment_name, equipment_status, 
                                      category_id, subcategory_id 
                               FROM equipment 
                               ORDER BY equipment_name")->fetchAll(PDO::FETCH_ASSOC);
 
-// Get employees for technician dropdown
-$employees_query = "SELECT employee_id, first_name, last_name, department_id 
+// Get employees for technician dropdown - แก้ไขตามโครงสร้าง employees
+$employees_query = "SELECT id, first_name, last_name, department_id 
                     FROM employees 
                     ORDER BY first_name, last_name";
 $employees_list = $db->query($employees_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Get frequently repaired equipment
+// Get frequently repaired equipment - แก้ไข JOIN ให้ตรงกับโครงสร้าง
 $frequent_repair_query = "
-    SELECT e.equipment_name, ec.category_name, es.subcategory_name, COUNT(mr.maintenance_id) as repair_count 
+    SELECT e.equipment_name, ec.category_name, es.subcategory_name, COUNT(mr.id) as repair_count 
     FROM equipment e 
-    JOIN maintenance_requests mr ON e.equipment_id = mr.equipment_id 
-    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
-    GROUP BY e.equipment_id, e.equipment_name, ec.category_name, es.subcategory_name 
-    HAVING COUNT(mr.maintenance_id) > 2 
+    JOIN maintenance_requests mr ON e.id = mr.equipment_id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
+    GROUP BY e.id, e.equipment_name, ec.category_name, es.subcategory_name 
+    HAVING COUNT(mr.id) > 2 
     ORDER BY repair_count DESC";
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
 
@@ -229,14 +229,81 @@ include 'includes/sidebar.php';
     </div>
     <?php endif; ?>
 
+    <!-- Real-time Filter Section -->
     <div class="card shadow mb-4">
-        <div class="card-header py-3">
+       
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">ค้นหาทั่วไป</label>
+                    <input type="text" class="form-control" id="globalSearch" placeholder="ค้นหาทั้งตาราง..." onkeyup="filterTable()">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">สถานะซ่อม</label>
+                    <select class="form-control" id="statusFilter" onchange="filterTable()">
+                        <option value="">ทั้งหมด</option>
+                        <option value="รอซ่อม">รอซ่อม</option>
+                        <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
+                        <option value="ซ่อมเสร็จ">ซ่อมเสร็จ</option>
+                        <option value="ยกเลิก">ยกเลิก</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">สถานะครุภัณฑ์</label>
+                    <select class="form-control" id="equipmentStatusFilter" onchange="filterTable()">
+                        <option value="">ทั้งหมด</option>
+                        <option value="ใหม่">ใหม่</option>
+                        <option value="ใช้งานปกติ">ใช้งานปกติ</option>
+                        <option value="รอซ่อม">รอซ่อม</option>
+                        <option value="กำลังซ่อม">กำลังซ่อม</option>
+                        <option value="ชำรุด">ชำรุด</option>
+                        <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">โรงเรียน</label>
+                    <select class="form-control" id="schoolFilter" onchange="filterTable()">
+                        <option value="">ทั้งหมด</option>
+                        <option value="VCS">โรงเรียนวารีเชียงใหม่</option>
+                        <option value="VKS">โรงเรียนอนุบาลวารีเชียงใหม่</option>
+                        <option value="VCIS">โรงเรียนนานาชาติวารีเชียงใหม่</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                                <i class="fas fa-redo"></i> ล้างตัวกรอง
+                            </button>
+                            <span class="ms-3 text-muted small" id="filterResultCount"></span>
+                        </div>
+                        <div class="text-muted small">
+                            <span id="currentTime"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h5 class="m-0 font-weight-bold">รายการซ่อมบำรุงทั้งหมด</h5>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportToExcel()">
+                    <i class="fas fa-file-excel"></i> Export Excel
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="printTable()">
+                    <i class="fas fa-print"></i> พิมพ์
+                </button>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-                    <thead>
+                <table class="table table-bordered table-hover" id="maintenanceTable" width="100%" cellspacing="0">
+                    <thead class="table-light">
                         <tr>
                             <th width="120">รหัสการซ่อม</th>
                             <th width="110">รหัสครุภัณฑ์</th>
@@ -292,7 +359,9 @@ include 'includes/sidebar.php';
                                 </div>
                             </td>
                             <td class="text-center">
-                                <small><?php echo date('d/m/Y', strtotime($maintenance['report_date'])); ?></small>
+                                <small data-sort="<?php echo $maintenance['report_date']; ?>">
+                                    <?php echo date('d/m/Y', strtotime($maintenance['report_date'])); ?>
+                                </small>
                             </td>
                             <td><?php echo $maintenance['reported_by']; ?></td>
                             <td>
@@ -337,7 +406,7 @@ include 'includes/sidebar.php';
                                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#maintenanceModal" onclick='editMaintenance(<?php echo json_encode($maintenance); ?>)' title="แก้ไข">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <a href="maintenance.php?action=delete&id=<?php echo $maintenance['maintenance_id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')" title="ลบ">
+                                    <a href="maintenance.php?action=delete&id=<?php echo $maintenance['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')" title="ลบ">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </div>
@@ -346,6 +415,16 @@ include 'includes/sidebar.php';
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+            
+            <!-- No Results Message -->
+            <div id="noResults" class="text-center py-4" style="display: none;">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">ไม่พบข้อมูลที่ตรงกับการค้นหา</h5>
+                <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
+                <button type="button" class="btn btn-outline-primary" onclick="clearFilters()">
+                    <i class="fas fa-redo"></i> ล้างตัวกรอง
+                </button>
             </div>
         </div>
     </div>
@@ -406,7 +485,7 @@ include 'includes/sidebar.php';
                             <select class="form-control" name="equipment_id" id="equipment_id" required onchange="showEquipmentStatus()">
                                 <option value="">เลือกครุภัณฑ์</option>
                                 <?php foreach($equipment_list as $equipment): ?>
-                                <option value="<?php echo $equipment['equipment_id']; ?>" data-status="<?php echo $equipment['equipment_status']; ?>">
+                                <option value="<?php echo $equipment['id']; ?>" data-status="<?php echo $equipment['equipment_status']; ?>">
                                     <?php echo $equipment['equipment_code'] . ' - ' . $equipment['equipment_name'] . ' (สถานะ: ' . $equipment['equipment_status'] . ')'; ?>
                                 </option>
                                 <?php endforeach; ?>
@@ -515,87 +594,198 @@ const schoolData = {
     }
 };
 
-function clearForm() {
-    document.getElementById('maintenanceForm').reset();
-    document.getElementById('maintenance_id').value = '';
+// Real-time Filter Functions
+function filterTable() {
+    const globalSearch = document.getElementById('globalSearch').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const equipmentStatusFilter = document.getElementById('equipmentStatusFilter').value;
+    const schoolFilter = document.getElementById('schoolFilter').value;
     
-    // สร้าง repair_code อัตโนมัติ
-    const now = new Date();
-    const yearMonth = now.toISOString().slice(0,7).replace(/-/g, '');
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    document.getElementById('repair_code').value = 'R' + yearMonth + '-' + randomNum;
+    const rows = document.querySelectorAll('#maintenanceTable tbody tr');
+    let visibleCount = 0;
     
-    document.getElementById('report_date').value = '<?php echo date('Y-m-d'); ?>';
-    document.getElementById('repair_cost').value = '0';
-    document.getElementById('maintenanceModalLabel').textContent = 'แจ้งซ่อมใหม่';
-    document.getElementById('submitBtn').name = 'add_maintenance';
-    document.getElementById('submitBtn').textContent = 'บันทึก';
-    document.getElementById('equipment_id').disabled = false;
+    rows.forEach(row => {
+        let showRow = true;
+        
+        // Global search filter
+        if (globalSearch) {
+            const rowText = row.textContent.toLowerCase();
+            if (!rowText.includes(globalSearch)) {
+                showRow = false;
+            }
+        }
+        
+        // Status filter
+        if (statusFilter && showRow) {
+            const statusCell = row.cells[8]; // Status column
+            const statusText = statusCell.textContent.trim();
+            if (statusText !== statusFilter) {
+                showRow = false;
+            }
+        }
+        
+        // Equipment status filter
+        if (equipmentStatusFilter && showRow) {
+            const equipStatusCell = row.cells[9]; // Equipment status column
+            const equipStatusText = equipStatusCell.textContent.trim();
+            if (equipStatusText !== equipmentStatusFilter) {
+                showRow = false;
+            }
+        }
+        
+        // School filter
+        if (schoolFilter && showRow) {
+            const locationCell = row.cells[3]; // Location column
+            const locationText = locationCell.textContent.trim();
+            if (!locationText.includes(schoolFilter)) {
+                showRow = false;
+            }
+        }
+        
+        // Show/hide row
+        row.style.display = showRow ? '' : 'none';
+        if (showRow) visibleCount++;
+    });
     
-    // Reset location dropdowns
-    document.getElementById('location_building').innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
-    document.getElementById('location_floor').innerHTML = '<option value="">เลือกชั้น</option>';
+    // Update result count
+    document.getElementById('filterResultCount').textContent = `พบ ${visibleCount} รายการ`;
     
-    // Hide equipment status alert
-    document.getElementById('equipmentStatusAlert').style.display = 'none';
+    // Show/hide no results message
+    const noResults = document.getElementById('noResults');
+    if (visibleCount === 0) {
+        noResults.style.display = 'block';
+    } else {
+        noResults.style.display = 'none';
+    }
 }
 
-function editMaintenance(maintenance) {
-    document.getElementById('maintenance_id').value = maintenance.maintenance_id;
-    document.getElementById('repair_code').value = maintenance.repair_code || '';
-    document.getElementById('equipment_id').value = maintenance.equipment_id;
-    document.getElementById('report_date').value = maintenance.report_date;
-    document.getElementById('problem_description').value = maintenance.problem_description || '';
-    document.getElementById('reported_by').value = maintenance.reported_by || '';
-    document.getElementById('assigned_technician').value = maintenance.assigned_technician || '';
-    document.getElementById('repair_cost').value = maintenance.repair_cost || '0';
-    document.getElementById('repair_status').value = maintenance.repair_status || 'รอซ่อม';
-    document.getElementById('solution_description').value = maintenance.solution_description || '';
-    document.getElementById('completed_date').value = maintenance.completed_date || '';
-    document.getElementById('location_room').value = maintenance.location_room || '';
+function clearFilters() {
+    document.getElementById('globalSearch').value = '';
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('equipmentStatusFilter').value = '';
+    document.getElementById('schoolFilter').value = '';
     
-    // Set location values
-    if (maintenance.location_school) {
-        document.getElementById('location_school').value = maintenance.location_school;
-        updateBuildings();
-        setTimeout(() => {
-            if (maintenance.location_building) {
-                document.getElementById('location_building').value = maintenance.location_building;
-                updateFloors();
-                setTimeout(() => {
-                    if (maintenance.location_floor) {
-                        document.getElementById('location_floor').value = maintenance.location_floor;
-                    }
-                }, 100);
+    filterTable();
+}
+
+function exportToExcel() {
+    // สร้างข้อมูลสำหรับ Excel
+    const table = document.getElementById('maintenanceTable');
+    let csv = [];
+    
+    // เพิ่มหัวข้อภาษาไทย
+    const headers = [
+        'รหัสการซ่อม',
+        'รหัสครุภัณฑ์', 
+        'ชื่ออุปกรณ์',
+        'สถานที่',
+        'ปัญหาที่พบ',
+        'วันที่แจ้งซ่อม',
+        'ผู้แจ้งซ่อม',
+        'ผู้ดำเนินการ',
+        'สถานะซ่อม',
+        'สถานะครุภัณฑ์'
+    ];
+    csv.push(headers.join(','));
+    
+    // เพิ่มข้อมูลแถว
+    for (let i = 1; i < table.rows.length; i++) {
+        const row = table.rows[i];
+        if (row.style.display !== 'none') {
+            const rowData = [];
+            for (let j = 0; j < row.cells.length - 1; j++) { // ไม่รวมคอลัมน์จัดการ
+                let cellText = row.cells[j].textContent.trim();
+                // ลบ HTML และเครื่องหมายต่างๆ ที่อาจทำให้ CSV ผิด格式
+                cellText = cellText.replace(/,/g, ' ').replace(/\n/g, ' ').replace(/\s+/g, ' ');
+                rowData.push(cellText);
             }
-        }, 100);
+            csv.push(rowData.join(','));
+        }
     }
     
-    document.getElementById('maintenanceModalLabel').textContent = 'แก้ไขข้อมูลการซ่อม';
-    document.getElementById('submitBtn').name = 'edit_maintenance';
-    document.getElementById('submitBtn').textContent = 'อัพเดท';
-    
-    // Disable equipment selection in edit mode
-    document.getElementById('equipment_id').disabled = true;
-    
-    // Show equipment status
-    showEquipmentStatus();
+    const csvString = csv.join('\n');
+    const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' }); // เพิ่ม BOM สำหรับภาษาไทย
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ข้อมูลซ่อมบำรุง_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
 }
 
-// อัปเดตตึกตามโรงเรียนที่เลือก
+function printTable() {
+    const printWindow = window.open('', '_blank');
+    const table = document.getElementById('maintenanceTable').cloneNode(true);
+    
+    // ลบคอลัมน์จัดการ
+    const rows = table.getElementsByTagName('tr');
+    for (let i = 0; i < rows.length; i++) {
+        if (rows[i].cells.length > 0) {
+            rows[i].deleteCell(-1); // ลบเซลล์สุดท้าย (คอลัมน์จัดการ)
+        }
+    }
+    
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>พิมพ์รายการซ่อมบำรุง</title>
+                <style>
+                    body { font-family: 'Sarabun', sans-serif; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f8f9fa; }
+                    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+                    .text-center { text-align: center; }
+                </style>
+            </head>
+            <body>
+                <h2 style="text-align: center; margin-bottom: 20px;">รายการซ่อมบำรุง</h2>
+                ${table.outerHTML}
+                <div style="margin-top: 20px; text-align: right; font-size: 12px;">
+                    พิมพ์เมื่อ: ${new Date().toLocaleString('th-TH')}
+                </div>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+// Update current time
+function updateCurrentTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = 
+        `อัปเดตล่าสุด: ${now.toLocaleString('th-TH', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        })}`;
+}
+
+setInterval(updateCurrentTime, 1000);
+updateCurrentTime();
+
+// Initialize filters
+document.addEventListener('DOMContentLoaded', function() {
+    filterTable(); // Apply initial filter
+});
+
+// Location selection functions
 function updateBuildings() {
     const schoolSelect = document.getElementById('location_school');
     const buildingSelect = document.getElementById('location_building');
     const floorSelect = document.getElementById('location_floor');
     
-    // ล้าง dropdown ตึกและชั้น
+    // Clear existing options
     buildingSelect.innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
     floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
     
-    const selectedSchool = schoolSelect.value;
-    if (selectedSchool && schoolData[selectedSchool]) {
-        // เพิ่มตึกตามโรงเรียนที่เลือก
-        schoolData[selectedSchool].buildings.forEach(building => {
+    if (schoolSelect.value && schoolData[schoolSelect.value]) {
+        const buildings = schoolData[schoolSelect.value].buildings;
+        buildings.forEach(building => {
             const option = document.createElement('option');
             option.value = building.name;
             option.textContent = building.name;
@@ -604,25 +794,21 @@ function updateBuildings() {
     }
 }
 
-// อัปเดตชั้นตามตึกที่เลือก
 function updateFloors() {
     const schoolSelect = document.getElementById('location_school');
     const buildingSelect = document.getElementById('location_building');
     const floorSelect = document.getElementById('location_floor');
     
-    // ล้าง dropdown ชั้น
+    // Clear existing options
     floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
     
-    const selectedSchool = schoolSelect.value;
-    const selectedBuilding = buildingSelect.value;
-    
-    if (selectedSchool && selectedBuilding && schoolData[selectedSchool]) {
-        // หาข้อมูลตึกที่เลือก
-        const building = schoolData[selectedSchool].buildings.find(b => b.name === selectedBuilding);
+    if (schoolSelect.value && buildingSelect.value && schoolData[schoolSelect.value]) {
+        const selectedBuilding = schoolData[schoolSelect.value].buildings.find(
+            building => building.name === buildingSelect.value
+        );
         
-        if (building) {
-            // เพิ่มชั้นตามตึกที่เลือก
-            building.floors.forEach(floor => {
+        if (selectedBuilding) {
+            selectedBuilding.floors.forEach(floor => {
                 const option = document.createElement('option');
                 option.value = floor;
                 option.textContent = floor;
@@ -634,32 +820,71 @@ function updateFloors() {
 
 function showEquipmentStatus() {
     const equipmentSelect = document.getElementById('equipment_id');
-    const selectedOption = equipmentSelect.options[equipmentSelect.selectedIndex];
-    const equipment_status = selectedOption.getAttribute('data-status');
-    const alertDiv = document.getElementById('equipmentStatusAlert');
+    const statusAlert = document.getElementById('equipmentStatusAlert');
     const statusText = document.getElementById('equipmentStatusText');
     
-    if (equipment_status) {
-        statusText.textContent = 'สถานะปัจจุบันของครุภัณฑ์: ' + equipment_status;
-        alertDiv.style.display = 'block';
+    if (equipmentSelect.value) {
+        const selectedOption = equipmentSelect.options[equipmentSelect.selectedIndex];
+        const equipmentStatus = selectedOption.getAttribute('data-status');
+        
+        statusText.textContent = `สถานะปัจจุบันของครุภัณฑ์: ${equipmentStatus}`;
+        statusAlert.style.display = 'block';
     } else {
-        alertDiv.style.display = 'none';
+        statusAlert.style.display = 'none';
     }
 }
 
-$(document).ready(function() {
-    $('#dataTable').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
-        },
-        order: [[5, 'desc']], // Sort by report date descending
-        pageLength: 25,
-        responsive: true,
-        columnDefs: [
-            { orderable: false, targets: [10] } // Disable sorting for action column
-        ]
-    });
-});
+function clearForm() {
+    document.getElementById('maintenanceForm').reset();
+    document.getElementById('maintenance_id').value = '';
+    document.getElementById('repair_code').value = '';
+    document.getElementById('maintenanceModalLabel').textContent = 'แจ้งซ่อมใหม่';
+    document.getElementById('submitBtn').name = 'add_maintenance';
+    document.getElementById('equipmentStatusAlert').style.display = 'none';
+    
+    // Reset location dropdowns
+    document.getElementById('location_building').innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
+    document.getElementById('location_floor').innerHTML = '<option value="">เลือกชั้น</option>';
+}
+
+function editMaintenance(data) {
+    document.getElementById('maintenanceModalLabel').textContent = 'แก้ไขข้อมูลการซ่อม';
+    document.getElementById('submitBtn').name = 'edit_maintenance';
+    
+    // Fill form with data
+    document.getElementById('maintenance_id').value = data.id;
+    document.getElementById('repair_code').value = data.repair_code;
+    document.getElementById('equipment_id').value = data.equipment_id;
+    document.getElementById('report_date').value = data.report_date;
+    document.getElementById('problem_description').value = data.problem_description;
+    document.getElementById('reported_by').value = data.reported_by;
+    document.getElementById('assigned_technician').value = data.assigned_technician;
+    document.getElementById('repair_status').value = data.repair_status;
+    document.getElementById('solution_description').value = data.solution_description || '';
+    document.getElementById('repair_cost').value = data.repair_cost || '0';
+    document.getElementById('completed_date').value = data.completed_date || '';
+    
+    // Fill location fields
+    document.getElementById('location_school').value = data.location_school;
+    updateBuildings();
+    
+    // Use setTimeout to ensure buildings are loaded before setting building value
+    setTimeout(() => {
+        document.getElementById('location_building').value = data.location_building;
+        updateFloors();
+        
+        // Use another setTimeout to ensure floors are loaded before setting floor value
+        setTimeout(() => {
+            document.getElementById('location_floor').value = data.location_floor;
+            document.getElementById('location_room').value = data.location_room;
+        }, 100);
+    }, 100);
+    
+    // Show equipment status
+    showEquipmentStatus();
+}
 </script>
 
-<?php require_once 'includes/footer.php'; ?>
+<?php
+require_once 'includes/footer.php';
+?>

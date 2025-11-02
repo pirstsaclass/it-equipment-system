@@ -6,16 +6,16 @@ $equipment_stats_query = "SELECT
     COUNT(*) as total,
     SUM(CASE WHEN equipment_status = 'ใหม่' THEN 1 ELSE 0 END) as new,
     SUM(CASE WHEN equipment_status = 'ชำรุด' THEN 1 ELSE 0 END) as damaged,
-    SUM(CASE WHEN equipment_status = 'รอซ่อม' THEN 1 ELSE 0 END) as repair,
+    SUM(CASE WHEN equipment_status = 'กำลังซ่อม' THEN 1 ELSE 0 END) as repair,
     SUM(CASE WHEN equipment_status = 'จำหน่ายแล้ว' THEN 1 ELSE 0 END) as disposed
     FROM equipment";
 $equipment_stats = $db->query($equipment_stats_query)->fetch(PDO::FETCH_ASSOC);
 
 // ครุภัณฑ์แยกตามประเภท - ใช้ตาราง equipment_categories และ equipment
-$equipment_by_category_query = "SELECT ec.category_name as name, COUNT(e.equipment_id) as count 
+$equipment_by_category_query = "SELECT ec.category_name as name, COUNT(e.id) as count 
     FROM equipment_categories ec 
-    LEFT JOIN equipment e ON ec.category_id = e.category_id 
-    GROUP BY ec.category_id, ec.category_name";
+    LEFT JOIN equipment e ON ec.id = e.category_id 
+    GROUP BY ec.id, ec.category_name";
 $equipment_by_category = $db->query($equipment_by_category_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // ครุภัณฑ์แยกตามสถานะ
@@ -25,24 +25,24 @@ $equipment_by_status_query = "SELECT equipment_status, COUNT(*) as count
 $equipment_by_status = $db->query($equipment_by_status_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // การซ่อมบำรุงล่าสุด - ใช้ตาราง maintenance_requests และ equipment
-$maintenance_query = "SELECT mr.*, e.equipment_code as code, e.equipment_name, ec.category_name, es.subcategory_name as item_name
+$maintenance_query = "SELECT mr.*, e.equipment_code, e.equipment_name, ec.category_name, es.subcategory_name
     FROM maintenance_requests mr 
-    JOIN equipment e ON mr.equipment_id = e.equipment_id 
-    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+    JOIN equipment e ON mr.equipment_id = e.id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
     ORDER BY mr.created_at DESC 
     LIMIT 5";
 $maintenance_list = $db->query($maintenance_query)->fetchAll(PDO::FETCH_ASSOC);
 
 // อุปกรณ์ที่ซ่อมบ่อย - ใช้ตาราง maintenance_requests และ equipment
 $frequent_repair_query = "
-    SELECT e.equipment_code as code, e.equipment_name as name, ec.category_name, es.subcategory_name as item_name, COUNT(mr.maintenance_id) as repair_count 
+    SELECT e.equipment_code, e.equipment_name, ec.category_name, es.subcategory_name, COUNT(mr.id) as repair_count 
     FROM equipment e 
-    JOIN maintenance_requests mr ON e.equipment_id = mr.equipment_id 
-    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
-    GROUP BY e.equipment_id, e.equipment_code, e.equipment_name, ec.category_name, es.subcategory_name 
-    HAVING COUNT(mr.maintenance_id) > 2 
+    JOIN maintenance_requests mr ON e.id = mr.equipment_id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
+    GROUP BY e.id, e.equipment_code, e.equipment_name, ec.category_name, es.subcategory_name 
+    HAVING COUNT(mr.id) > 2 
     ORDER BY repair_count DESC 
     LIMIT 5";
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
@@ -109,7 +109,7 @@ include 'includes/sidebar.php';
                                     <i class="fas fa-tools fa-2x"></i>
                                 </div>
                                 <div class="h4 font-weight-bold"><?php echo $equipment_stats['repair']; ?></div>
-                                <div class="text-muted">รอซ่อม</div>
+                                <div class="text-muted">กำลังซ่อม</div>
                             </div>
                         </div>
                     </div>
@@ -129,8 +129,8 @@ include 'includes/sidebar.php';
                             <?php foreach($frequent_repairs as $freq): ?>
                             <div class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="mb-1"><?php echo $freq['code']; ?></h6>
-                                    <small class="text-muted"><?php echo $freq['name']; ?></small>
+                                    <h6 class="mb-1"><?php echo $freq['equipment_code']; ?></h6>
+                                    <small class="text-muted"><?php echo $freq['equipment_name']; ?></small>
                                 </div>
                                 <span class="badge bg-warning rounded-pill"><?php echo $freq['repair_count']; ?> ครั้ง</span>
                             </div>
@@ -199,7 +199,7 @@ include 'includes/sidebar.php';
                             <tbody>
                                 <?php foreach($maintenance_list as $maintenance): ?>
                                 <tr>
-                                    <td class="fw-bold"><?php echo $maintenance['code']; ?></td>
+                                    <td class="fw-bold"><?php echo $maintenance['equipment_code']; ?></td>
                                     <td><?php echo $maintenance['equipment_name']; ?></td>
                                     <td><?php echo date('d/m/Y', strtotime($maintenance['report_date'])); ?></td>
                                     <td><?php echo $maintenance['assigned_technician'] ?: 'ยังไม่ได้มอบหมาย'; ?></td>
@@ -220,10 +220,10 @@ include 'includes/sidebar.php';
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <a href="maintenance.php?action=edit&id=<?php echo $maintenance['maintenance_id']; ?>" class="btn btn-primary">
+                                            <a href="maintenance.php?action=edit&id=<?php echo $maintenance['id']; ?>" class="btn btn-primary">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="maintenance.php?action=delete&id=<?php echo $maintenance['maintenance_id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                            <a href="maintenance.php?action=delete&id=<?php echo $maintenance['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                         </div>
