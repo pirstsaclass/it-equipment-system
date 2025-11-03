@@ -45,8 +45,8 @@ if (!empty($conditions)) {
 // Get equipment for report
 $report_query = "SELECT e.*, ec.category_name, es.subcategory_name, d.department_name 
     FROM equipment e 
-    LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+    LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+    LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
     LEFT JOIN departments d ON e.responsible_person LIKE CONCAT('%', d.department_name, '%')
     $where_clause 
     ORDER BY e.purchase_date DESC";
@@ -173,8 +173,8 @@ if (isset($_POST['ajax_filter'])) {
     
     $ajax_query = "SELECT e.*, ec.category_name, es.subcategory_name, d.department_name 
         FROM equipment e 
-        LEFT JOIN equipment_categories ec ON e.category_id = ec.category_id 
-        LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.subcategory_id 
+        LEFT JOIN equipment_categories ec ON e.category_id = ec.id 
+        LEFT JOIN equipment_subcategories es ON e.subcategory_id = es.id 
         LEFT JOIN departments d ON e.responsible_person LIKE CONCAT('%', d.department_name, '%')
         $ajax_where_clause 
         ORDER BY e.purchase_date DESC";
@@ -260,7 +260,7 @@ include 'includes/sidebar.php';
                     <select class="form-control filter-input" name="category_id" id="category_id">
                         <option value="">ทั้งหมด</option>
                         <?php foreach($categories as $category): ?>
-                        <option value="<?php echo $category['category_id']; ?>" <?php echo $category_id == $category['category_id'] ? 'selected' : ''; ?>>
+                        <option value="<?php echo $category['id']; ?>" <?php echo $category_id == $category['id'] ? 'selected' : ''; ?>>
                             <?php echo $category['category_name']; ?>
                         </option>
                         <?php endforeach; ?>

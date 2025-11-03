@@ -42,6 +42,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'disposal.php' ? 'active' : ''; ?>" href="disposal.php">
+                        <i class="fas fa-trash-alt me-2"></i>
+                        ระบบจำหน่ายครุภัณฑ์
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'equipment_classroom.php' ? 'active' : ''; ?>" href="equipment_classroom.php">
                         <i class="fas fa-chalkboard-teacher"></i>
                         <span>อุปกรณ์ในห้องเรียน</span>
@@ -57,7 +63,7 @@
                 <li class="nav-item">
                     <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'departments.php' ? 'active' : ''; ?>" href="departments.php">
                         <i class="fas fa-fw fa-building"></i>
-                        แผนก
+                        โรงเรียน/แผนก
                     </a>
                 </li>                
                 <li class="nav-item">

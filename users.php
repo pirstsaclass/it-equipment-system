@@ -173,7 +173,7 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
                                     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <?php if ($user['id'] != $_SESSION['id']): ?>
+                                    <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                         <a href="users.php?action=toggle_active&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-<?php echo $user['is_active'] ? 'warning' : 'success'; ?>" title="<?php echo $user['is_active'] ? 'ปิดใช้งาน' : 'เปิดใช้งาน'; ?>">
                                             <i class="fas fa-<?php echo $user['is_active'] ? 'pause' : 'play'; ?>"></i>
                                         </a>
@@ -282,7 +282,7 @@ $(document).ready(function() {
         },
         order: [[0, 'asc']], // เรียงตามคอลัมน์ลำดับ
         columnDefs: [
-            { orderable: false, targets: [6] } // ปิดการเรียงลำดับคอลัมน์จัดการ (เปลี่ยนจาก 7 เป็น 6)
+            { orderable: false, targets: [7] } // ปิดการเรียงลำดับคอลัมน์จัดการ
         ],
         pageLength: 25,
         responsive: true

@@ -198,10 +198,24 @@ if ($_POST) {
     }
 }
 
+// นับจำนวนครุภัณฑ์ตามสถานะ
+try {
+    $status_counts = $db->query("
+        SELECT equipment_status, COUNT(*) as count 
+        FROM equipment 
+        GROUP BY equipment_status
+    ")->fetchAll(PDO::FETCH_KEY_PAIR);
+} catch (PDOException $e) {
+    $status_counts = [];
+}
+
+// นับจำนวนครุภัณฑ์ทั้งหมด
+$total_equipment = array_sum($status_counts);
+
 // รับค่าการค้นหาและกรองข้อมูล
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $filter_equipment_status = isset($_GET['equipment_status']) ? $_GET['equipment_status'] : '';
-$records_per_page = isset($_GET['per_page']) ? intval($_GET['per_page']) : 20;
+$records_per_page = 20; // กำหนดคงที่ 20 รายการต่อหน้า
 
 // สร้างเงื่อนไขการค้นหา
 $where_conditions = [];
@@ -281,8 +295,10 @@ try {
     $subcategories_all = [];
 }
 
+
+
 // สร้าง URL สำหรับ pagination (ต้องประกาศก่อนใช้งาน)
-function getPageUrl($page, $search, $filter_equipment_status, $per_page) {
+function getPageUrl($page, $search, $filter_equipment_status) {
     $params = ['page' => $page];
     if (!empty($search)) {
         $params['search'] = $search;
@@ -290,10 +306,185 @@ function getPageUrl($page, $search, $filter_equipment_status, $per_page) {
     if (!empty($filter_equipment_status)) {
         $params['equipment_status'] = $filter_equipment_status;
     }
-    if ($per_page != 20) {
-        $params['per_page'] = $per_page;
-    }
     return 'equipment.php?' . http_build_query($params);
+}
+
+// ตรวจสอบว่าเป็น AJAX request
+if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
+    // ส่งเฉพาะ HTML ของตารางและ pagination
+    ob_start();
+    ?>
+    
+    <!-- แสดงข้อมูลการแบ่งหน้า -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="text-muted">
+            แสดง <?php echo number_format($offset + 1); ?>-<?php echo number_format(min($offset + $records_per_page, $total_records)); ?> 
+            จาก <?php echo number_format($total_records); ?> รายการ
+            <?php if ($total_pages > 1): ?>
+                | หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+            <thead class="table-light">
+                <tr>
+                    <th width="12%">รหัสครุภัณฑ์</th>
+                    <th width="18%">ชื่อครุภัณฑ์</th>
+                    <th width="12%">หมวดหมู่</th>
+                    <th width="12%">หมวดหมู่ย่อย</th>
+                    <th width="10%">สถานะครุภัณฑ์</th>
+                    <th width="10%">สถานะซ่อม</th>
+                    <th width="12%">ตำแหน่งที่ตั้ง</th>
+                    <th width="14%">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (count($equipment_list) > 0): ?>
+                    <?php foreach($equipment_list as $equipment): ?>
+                    <tr>
+                        <td class="fw-bold text-primary"><?php echo $equipment['equipment_code']; ?></td>
+                        <td><?php echo $equipment['equipment_name']; ?></td>
+                        <td>
+                            <span class="badge bg-secondary"><?php echo $equipment['category_name'] ?? '-'; ?></span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark"><?php echo $equipment['subcategory_name'] ?? '-'; ?></span>
+                        </td>
+                        <td>
+                            <?php 
+                            $equipment_status_badge = [
+                                'ใหม่' => 'success',
+                                'ใช้งานปกติ' => 'primary',
+                                'ชำรุด' => 'warning',
+                                'กำลังซ่อม' => 'info',
+                                'ซ่อมเสร็จแล้ว' => 'success',
+                                'จำหน่ายแล้ว' => 'dark'
+                            ];
+                            $status_class = $equipment_status_badge[$equipment['equipment_status']] ?? 'secondary';
+                            ?>
+                            <span class="badge bg-<?php echo $status_class; ?>">
+                                <?php echo $equipment['equipment_status']; ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php 
+                            $repair_status_badge = [
+                                'รอซ่อม' => 'warning',
+                                'กำลังดำเนินการ' => 'info',
+                                'ซ่อมเสร็จ' => 'success',
+                                'ยกเลิก' => 'danger'
+                            ];
+                            $repair_status = $equipment['repair_status'];
+                            $maintenance_class = $repair_status_badge[$repair_status] ?? 'secondary';
+                            ?>
+                            <span class="badge bg-<?php echo $maintenance_class; ?>">
+                                <?php echo $repair_status ?: 'ไม่มี'; ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php 
+                            $location_parts = [];
+                            if (!empty($equipment['location_building'])) $location_parts[] = $equipment['location_building'];
+                            if (!empty($equipment['location_floor'])) $location_parts[] = 'ชั้น ' . $equipment['location_floor'];
+                            if (!empty($equipment['location_room'])) $location_parts[] = $equipment['location_room'];
+                            echo implode(' / ', $location_parts) ?: '-';
+                            ?>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#viewModal" onclick='viewEquipment(<?php echo json_encode($equipment); ?>)' title="ดูรายละเอียด">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick='editEquipment(<?php echo json_encode($equipment); ?>)' title="แก้ไข">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <a href="equipment.php?action=delete&id=<?php echo $equipment['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์</h5>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <?php if ($total_pages > 1): ?>
+    <nav aria-label="Page navigation">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted small d-none d-md-block">
+                หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?> 
+                (ทั้งหมด <?php echo number_format($total_records); ?> รายการ)
+            </div>
+            
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo getPageUrl(1, $search, $filter_equipment_status); ?>" aria-label="First">
+                        <span aria-hidden="true">&laquo;&laquo;</span>
+                    </a>
+                </li>
+                
+                <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo getPageUrl($current_page - 1, $search, $filter_equipment_status); ?>" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+
+                <?php
+                $start_page = max(1, $current_page - 2);
+                $end_page = min($total_pages, $current_page + 2);
+                
+                if ($start_page > 1) {
+                    echo '<li class="page-item"><a class="page-link" href="' . getPageUrl(1, $search, $filter_equipment_status) . '">1</a></li>';
+                    if ($start_page > 2) {
+                        echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                    }
+                }
+                
+                for ($i = $start_page; $i <= $end_page; $i++) {
+                    $active = $i == $current_page ? 'active' : '';
+                    echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . getPageUrl($i, $search, $filter_equipment_status) . '">' . $i . '</a></li>';
+                }
+                
+                if ($end_page < $total_pages) {
+                    if ($end_page < $total_pages - 1) {
+                        echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                    }
+                    echo '<li class="page-item"><a class="page-link" href="' . getPageUrl($total_pages, $search, $filter_equipment_status) . '">' . $total_pages . '</a></li>';
+                }
+                ?>
+
+                <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo getPageUrl($current_page + 1, $search, $filter_equipment_status); ?>" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                
+                <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="<?php echo getPageUrl($total_pages, $search, $filter_equipment_status); ?>" aria-label="Last">
+                        <span aria-hidden="true">&raquo;&raquo;</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+    <?php endif; ?>
+    
+    <?php
+    $html = ob_get_clean();
+    echo $html;
+    exit;
 }
 ?>
 
@@ -326,74 +517,175 @@ include 'includes/sidebar.php';
         </div>
     <?php endif; ?>
 
+<!-- การ์ดแสดงสถิติครุภัณฑ์ -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card bg-primary text-white shadow h-100">
+            <div class="card-body py-2">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
+                            ครุภัณฑ์ทั้งหมด</div>
+                        <div class="h6 mb-0 font-weight-bold"><?php echo number_format($total_equipment); ?></div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-boxes fa-lg text-white-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card bg-success text-white shadow h-100">
+            <div class="card-body py-2">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
+                            ใช้งานปกติ</div>
+                        <div class="h6 mb-0 font-weight-bold"><?php echo number_format($status_counts['ใช้งานปกติ'] ?? 0); ?></div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-lg text-white-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card bg-warning text-white shadow h-100">
+            <div class="card-body py-2">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
+                            กำลังซ่อม/ชำรุด</div>
+                        <div class="h6 mb-0 font-weight-bold">
+                            <?php echo number_format(($status_counts['กำลังซ่อม'] ?? 0) + ($status_counts['ชำรุด'] ?? 0)); ?>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tools fa-lg text-white-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card bg-danger text-white shadow h-100">
+            <div class="card-body py-2">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
+                            จำหน่ายแล้ว</div>
+                        <div class="h6 mb-0 font-weight-bold"><?php echo number_format($status_counts['จำหน่ายแล้ว'] ?? 0); ?></div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-archive fa-lg text-white-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
     <div class="card shadow mb-4">
-        <div class="card-header py-3">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-dark">รายการครุภัณฑ์ทั้งหมด</h6>
+            <div class="d-flex align-items-center">
+                <span id="currentTime" class="text-muted small me-3"></span>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success btn-sm" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Export
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="printTable()">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+            </div>
         </div>
         <div class="card-body">
-            <!-- ช่องค้นหาและกรองข้อมูล -->
-            <form method="GET" class="mb-4">
-                <div class="row g-3 align-items-end">
-                    
-                    <div class="col-md-4">
-                        <div class="input-group">
-                            <input type="text" class="form-control" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="กรอกรหัสครุภัณฑ์, ชื่อ, หมวดหมู่, ตึก, ห้อง...">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-search"></i>
+            <!-- ตัวกรองข้อมูลแบบ Real-time -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="m-0 font-weight-bold text-dark">
+                        <i class="fas fa-filter me-2"></i>ตัวกรองข้อมูล
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- ช่องค้นหาทั่วไป -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">ค้นหาทั่วไป</label>
+                            <input type="text" class="form-control" id="globalSearch" 
+                                   placeholder="ค้นหาด้วยรหัส, ชื่อ, หมวดหมู่, ตึก, ห้อง..." 
+                                   onkeyup="filterTable()">
+                        </div>
+
+                        <!-- Dropdown กรองสถานะครุภัณฑ์ -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">สถานะครุภัณฑ์</label>
+                            <select class="form-control" id="equipmentStatusFilter" onchange="filterTable()">
+                                <option value="">ทั้งหมด</option>
+                                <option value="ใหม่">ใหม่</option>
+                                <option value="ใช้งานปกติ">ใช้งานปกติ</option>
+                                <option value="ชำรุด">ชำรุด</option>
+                                <option value="กำลังซ่อม">กำลังซ่อม</option>
+                                <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
+                                <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
+                            </select>
+                        </div>
+
+                        <!-- Dropdown กรองสถานะซ่อม -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">สถานะซ่อม</label>
+                            <select class="form-control" id="repairStatusFilter" onchange="filterTable()">
+                                <option value="">ทั้งหมด</option>
+                                <option value="ไม่มี">ไม่มี</option>
+                                <option value="รอซ่อม">รอซ่อม</option>
+                                <option value="กำลังดำเนินการ">กำลังดำเนินการ</option>
+                                <option value="ซ่อมเสร็จ">ซ่อมเสร็จ</option>
+                                <option value="ยกเลิก">ยกเลิก</option>
+                            </select>
+                        </div>
+
+                        <!-- Dropdown กรองโรงเรียน -->
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold">โรงเรียน</label>
+                            <select class="form-control" id="schoolFilter" onchange="filterTable()">
+                                <option value="">ทั้งหมด</option>
+                                <option value="โรงเรียนวารีเชียงใหม่">โรงเรียนวารีเชียงใหม่</option>
+                                <option value="โรงเรียนอนุบาลวารีเชียงใหม่">โรงเรียนอนุบาลวารีเชียงใหม่</option>
+                                <option value="โรงเรียนนานาชาติวารีเชียงใหม่">โรงเรียนนานาชาติวารีเชียงใหม่</option>
+                            </select>
+                        </div>
+
+                        <!-- ปุ่มล้างตัวกรอง -->
+                        <div class="col-md-12 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                <i class="fas fa-redo me-1"></i> ล้างตัวกรองทั้งหมด
                             </button>
                         </div>
                     </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">สถานะครุภัณฑ์</label>
-                        <select class="form-control" name="equipment_status" onchange="this.form.submit()">
-                            <option value="">-- ทุกสถานะ --</option>
-                            <option value="ใหม่" <?php echo ($filter_equipment_status == 'ใหม่') ? 'selected' : ''; ?>>ใหม่</option>
-                            <option value="ใช้งานปกติ" <?php echo ($filter_equipment_status == 'ใช้งานปกติ') ? 'selected' : ''; ?>>ใช้งานปกติ</option>
-                            <option value="ชำรุด" <?php echo ($filter_equipment_status == 'ชำรุด') ? 'selected' : ''; ?>>ชำรุด</option>
-                            <option value="กำลังซ่อม" <?php echo ($filter_equipment_status == 'กำลังซ่อม') ? 'selected' : ''; ?>>กำลังซ่อม</option>
-                            <option value="ซ่อมเสร็จแล้ว" <?php echo ($filter_equipment_status == 'ซ่อมเสร็จแล้ว') ? 'selected' : ''; ?>>ซ่อมเสร็จแล้ว</option>
-                            <option value="จำหน่ายแล้ว" <?php echo ($filter_equipment_status == 'จำหน่ายแล้ว') ? 'selected' : ''; ?>>จำหน่ายแล้ว</option>
-                        </select>
-                    </div>
-                                        
-                    <!-- Dropdown เลือกจำนวนรายการต่อหน้า -->
-                    <div class="col-md-2">
-                        <label class="form-label fw-bold">แสดงต่อหน้า</label>
-                        <select class="form-control" name="per_page" onchange="this.form.submit()">
-                            <option value="10" <?php echo ($records_per_page == 10) ? 'selected' : ''; ?>>10 รายการ</option>
-                            <option value="20" <?php echo ($records_per_page == 20) ? 'selected' : ''; ?>>20 รายการ</option>
-                            <option value="50" <?php echo ($records_per_page == 50) ? 'selected' : ''; ?>>50 รายการ</option>
-                            <option value="100" <?php echo ($records_per_page == 100) ? 'selected' : ''; ?>>100 รายการ</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-1">
-                        <?php if (!empty($search) || !empty($filter_equipment_status) || $records_per_page != 20): ?>
-                            <a href="equipment.php" class="btn btn-secondary w-100" title="ล้างการค้นหา">
-                                <i class="fas fa-redo"></i>
-                            </a>
-                        <?php endif; ?>
+
+                    <!-- นับจำนวนผลลัพธ์ -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="alert alert-info py-2 mb-0" id="resultCount">
+                                <i class="fas fa-info-circle me-2"></i>
+                                พบข้อมูลครุภัณฑ์ทั้งหมด <strong id="totalCount"><?php echo number_format($total_records); ?></strong> รายการ
+                                | กำลังแสดง <strong id="showingCount"><?php echo number_format(count($equipment_list)); ?></strong> รายการ
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </form>
-
-            <!-- สถิติการค้นหา -->
-            <?php if (!empty($search) || !empty($filter_equipment_status)): ?>
-            <div class="alert alert-info mb-3">
-                <i class="fas fa-info-circle"></i> 
-                พบข้อมูลครุภัณฑ์ทั้งหมด <strong><?php echo number_format($total_records); ?></strong> รายการ
-                <?php if (!empty($search)): ?>
-                    | คำค้นหา: "<strong><?php echo htmlspecialchars($search); ?></strong>"
-                <?php endif; ?>
-                <?php if (!empty($filter_equipment_status)): ?>
-                    | สถานะ: "<strong><?php echo $filter_equipment_status; ?></strong>"
-                <?php endif; ?>
             </div>
-            <?php endif; ?>
 
             <!-- แสดงข้อมูลการแบ่งหน้า -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div id="paginationInfo" class="d-flex justify-content-between align-items-center mb-3">
                 <div class="text-muted">
                     แสดง <?php echo number_format($offset + 1); ?>-<?php echo number_format(min($offset + $records_per_page, $total_records)); ?> 
                     จาก <?php echo number_format($total_records); ?> รายการ
@@ -403,334 +695,381 @@ include 'includes/sidebar.php';
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
-                    <thead class="table-light">
-                        <tr>
-                            <th width="12%">รหัสครุภัณฑ์</th>
-                            <th width="18%">ชื่อครุภัณฑ์</th>
-                            <th width="12%">หมวดหมู่</th>
-                            <th width="12%">หมวดหมู่ย่อย</th>
-                            <th width="10%">สถานะครุภัณฑ์</th>
-                            <th width="10%">สถานะซ่อม</th>
-                            <th width="12%">ตำแหน่งที่ตั้ง</th>
-                            <th width="14%">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (count($equipment_list) > 0): ?>
-                            <?php foreach($equipment_list as $equipment): ?>
+            <div id="equipmentTableContainer">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover" width="100%" cellspacing="0" id="equipmentTable">
+                        <thead class="table-light">
                             <tr>
-                                <td class="fw-bold text-primary"><?php echo $equipment['equipment_code']; ?></td>
-                                <td><?php echo $equipment['equipment_name']; ?></td>
-                                <td>
-                                    <span class="badge bg-secondary"><?php echo $equipment['category_name'] ?? '-'; ?></span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-dark"><?php echo $equipment['subcategory_name'] ?? '-'; ?></span>
-                                </td>
-                                <td>
-                                    <?php 
-                                    $equipment_status_badge = [
-                                        'ใหม่' => 'success',
-                                        'ใช้งานปกติ' => 'primary',
-                                        'ชำรุด' => 'warning',
-                                        'กำลังซ่อม' => 'info',
-                                        'ซ่อมเสร็จแล้ว' => 'success',
-                                        'จำหน่ายแล้ว' => 'danger'
-                                    ];
-                                    $status_class = $equipment_status_badge[$equipment['equipment_status']] ?? 'secondary';
-                                    ?>
-                                    <span class="badge bg-<?php echo $status_class; ?>">
-                                        <?php echo $equipment['equipment_status']; ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php 
-                                    $repair_status_badge = [
-                                        'รอซ่อม' => 'warning',
-                                        'กำลังดำเนินการ' => 'info',
-                                        'ซ่อมเสร็จ' => 'success',
-                                        'ยกเลิก' => 'danger'
-                                    ];
-                                    $repair_status = $equipment['repair_status'];
-                                    $maintenance_class = $repair_status_badge[$repair_status] ?? 'secondary';
-                                    ?>
-                                    <span class="badge bg-<?php echo $maintenance_class; ?>">
-                                        <?php echo $repair_status ?: 'ไม่มี'; ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php 
-                                    $location_parts = [];
-                                    if (!empty($equipment['location_building'])) $location_parts[] = $equipment['location_building'];
-                                    if (!empty($equipment['location_floor'])) $location_parts[] = 'ชั้น ' . $equipment['location_floor'];
-                                    if (!empty($equipment['location_room'])) $location_parts[] = $equipment['location_room'];
-                                    echo implode(' / ', $location_parts) ?: '-';
-                                    ?>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#viewModal" onclick='viewEquipment(<?php echo json_encode($equipment); ?>)' title="ดูรายละเอียด">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick='editEquipment(<?php echo json_encode($equipment); ?>)' title="แก้ไข">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <a href="equipment.php?action=delete&id=<?php echo $equipment['id']; ?><?php echo !empty($search) ? '&search='.urlencode($search) : ''; ?><?php echo !empty($filter_equipment_status) ? '&equipment_status='.$filter_equipment_status : ''; ?><?php echo ($records_per_page != 20) ? '&per_page='.$records_per_page : ''; ?><?php echo ($current_page > 1) ? '&page='.$current_page : ''; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
-                                </td>
+                                <th width="12%">รหัสครุภัณฑ์</th>
+                                <th width="18%">ชื่อครุภัณฑ์</th>
+                                <th width="12%">หมวดหมู่</th>
+                                <th width="12%">หมวดหมู่ย่อย</th>
+                                <th width="10%">สถานะครุภัณฑ์</th>
+                                <th width="10%">สถานะซ่อม</th>
+                                <th width="12%">ตำแหน่งที่ตั้ง</th>
+                                <th width="14%">จัดการ</th>
                             </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="8" class="text-center py-4">
-                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                    <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์</h5>
-                                    <?php if (!empty($search) || !empty($filter_equipment_status)): ?>
-                                        <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือ <a href="equipment.php" class="text-primary">ล้างการค้นหา</a></p>
-                                    <?php else: ?>
-                                        <p class="text-muted">คลิกปุ่ม "เพิ่มครุภัณฑ์" เพื่อเพิ่มข้อมูลครุภัณฑ์แรก</p>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <?php if ($total_pages > 1): ?>
-            <nav aria-label="Page navigation">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="text-muted small d-none d-md-block">
-                        หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?> 
-                        (ทั้งหมด <?php echo number_format($total_records); ?> รายการ)
-                    </div>
-                    
-                    <ul class="pagination justify-content-center mb-0">
-                        <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="<?php echo getPageUrl(1, $search, $filter_equipment_status, $records_per_page); ?>" aria-label="First">
-                                <span aria-hidden="true">&laquo;&laquo;</span>
-                            </a>
-                        </li>
-                        
-                        <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="<?php echo getPageUrl($current_page - 1, $search, $filter_equipment_status, $records_per_page); ?>" aria-label="Previous">
-                                <span aria-hidden="true">&laquo;</span>
-                            </a>
-                        </li>
-
-                        <?php
-                        $start_page = max(1, $current_page - 2);
-                        $end_page = min($total_pages, $current_page + 2);
-                        
-                        if ($start_page > 1) {
-                            echo '<li class="page-item"><a class="page-link" href="' . getPageUrl(1, $search, $filter_equipment_status, $records_per_page) . '">1</a></li>';
-                            if ($start_page > 2) {
-                                echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                            }
-                        }
-                        
-                        for ($i = $start_page; $i <= $end_page; $i++) {
-                            $active = $i == $current_page ? 'active' : '';
-                            echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . getPageUrl($i, $search, $filter_equipment_status, $records_per_page) . '">' . $i . '</a></li>';
-                        }
-                        
-                        if ($end_page < $total_pages) {
-                            if ($end_page < $total_pages - 1) {
-                                echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                            }
-                            echo '<li class="page-item"><a class="page-link" href="' . getPageUrl($total_pages, $search, $filter_equipment_status, $records_per_page) . '">' . $total_pages . '</a></li>';
-                        }
-                        ?>
-
-                        <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="<?php echo getPageUrl($current_page + 1, $search, $filter_equipment_status, $records_per_page); ?>" aria-label="Next">
-                                <span aria-hidden="true">&raquo;</span>
-                            </a>
-                        </li>
-                        
-                        <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="<?php echo getPageUrl($total_pages, $search, $filter_equipment_status, $records_per_page); ?>" aria-label="Last">
-                                <span aria-hidden="true">&raquo;&raquo;</span>
-                            </a>
-                        </li>
-                    </ul>
+                        </thead>
+                        <tbody id="equipmentTableBody">
+                            <?php if (count($equipment_list) > 0): ?>
+                                <?php foreach($equipment_list as $equipment): ?>
+                                <tr class="equipment-row" 
+                                    data-code="<?php echo $equipment['equipment_code']; ?>"
+                                    data-name="<?php echo htmlspecialchars($equipment['equipment_name']); ?>"
+                                    data-category="<?php echo htmlspecialchars($equipment['category_name'] ?? ''); ?>"
+                                    data-subcategory="<?php echo htmlspecialchars($equipment['subcategory_name'] ?? ''); ?>"
+                                    data-status="<?php echo $equipment['equipment_status']; ?>"
+                                    data-repair-status="<?php echo $equipment['repair_status'] ?: 'ไม่มี'; ?>"
+                                    data-school="<?php echo htmlspecialchars($equipment['location_school'] ?? ''); ?>"
+                                    data-building="<?php echo htmlspecialchars($equipment['location_building'] ?? ''); ?>"
+                                    data-room="<?php echo htmlspecialchars($equipment['location_room'] ?? ''); ?>">
+                                    <td class="fw-bold text-primary"><?php echo $equipment['equipment_code']; ?></td>
+                                    <td><?php echo $equipment['equipment_name']; ?></td>
+                                    <td>
+                                        <span class="badge bg-secondary"><?php echo $equipment['category_name'] ?? '-'; ?></span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark"><?php echo $equipment['subcategory_name'] ?? '-'; ?></span>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $equipment_status_badge = [
+                                            'ใหม่' => 'success',
+                                            'ใช้งานปกติ' => 'primary',
+                                            'ชำรุด' => 'warning',
+                                            'กำลังซ่อม' => 'info',
+                                            'ซ่อมเสร็จแล้ว' => 'success',
+                                            'จำหน่ายแล้ว' => 'dark'
+                                        ];
+                                        $status_class = $equipment_status_badge[$equipment['equipment_status']] ?? 'secondary';
+                                        ?>
+                                        <span class="badge bg-<?php echo $status_class; ?>">
+                                            <?php echo $equipment['equipment_status']; ?>
+                                        </span>
+                                        
+                                        <?php 
+                                        // ถ้าครุภัณฑ์ถูกจำหน่ายแล้ว ให้แสดงข้อมูลการจำหน่าย
+                                        if ($equipment['equipment_status'] == 'จำหน่ายแล้ว') {
+                                            // ดึงข้อมูลการจำหน่ายล่าสุด
+                                            $disposal_query = "SELECT disposal_date, disposal_method 
+                                                              FROM equipment_disposals 
+                                                              WHERE equipment_id = ? 
+                                                              ORDER BY disposal_date DESC 
+                                                              LIMIT 1";
+                                            $disposal_stmt = $db->prepare($disposal_query);
+                                            $disposal_stmt->execute([$equipment['id']]);
+                                            $disposal_info = $disposal_stmt->fetch(PDO::FETCH_ASSOC);
+                                            
+                                            if ($disposal_info) {
+                                                echo '<br><small class="text-muted">';
+                                                echo date('d/m/Y', strtotime($disposal_info['disposal_date']));
+                                                echo ' | ' . $disposal_info['disposal_method'];
+                                                echo '</small>';
+                                            }
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $repair_status_badge = [
+                                            'รอซ่อม' => 'warning',
+                                            'กำลังดำเนินการ' => 'info',
+                                            'ซ่อมเสร็จ' => 'success',
+                                            'ยกเลิก' => 'danger'
+                                        ];
+                                        $repair_status = $equipment['repair_status'];
+                                        $maintenance_class = $repair_status_badge[$repair_status] ?? 'secondary';
+                                        ?>
+                                        <span class="badge bg-<?php echo $maintenance_class; ?>">
+                                            <?php echo $repair_status ?: 'ไม่มี'; ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $location_parts = [];
+                                        if (!empty($equipment['location_building'])) $location_parts[] = $equipment['location_building'];
+                                        if (!empty($equipment['location_floor'])) $location_parts[] = 'ชั้น ' . $equipment['location_floor'];
+                                        if (!empty($equipment['location_room'])) $location_parts[] = $equipment['location_room'];
+                                        echo implode(' / ', $location_parts) ?: '-';
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#viewModal" onclick='viewEquipment(<?php echo json_encode($equipment); ?>)' title="ดูรายละเอียด">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick='editEquipment(<?php echo json_encode($equipment); ?>)' title="แก้ไข">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <a href="equipment.php?action=delete&id=<?php echo $equipment['id']; ?>" class="btn btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบครุภัณฑ์นี้?')" title="ลบ">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="8" class="text-center py-4">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์</h5>
+                                        <?php if (!empty($search)): ?>
+                                            <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือล้างการค้นหา</p>
+                                            <a href="equipment.php" class="btn btn-primary">แสดงครุภัณฑ์ทั้งหมด</a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
-            </nav>
-            <?php endif; ?>
+
+                <!-- Pagination -->
+                <?php if ($total_pages > 1): ?>
+                <nav aria-label="Page navigation">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted small d-none d-md-block">
+                            หน้า <?php echo $current_page; ?> จาก <?php echo $total_pages; ?> 
+                            (ทั้งหมด <?php echo number_format($total_records); ?> รายการ)
+                        </div>
+                        
+                        <ul class="pagination justify-content-center mb-0">
+                            <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="<?php echo getPageUrl(1, $search, $filter_equipment_status); ?>" aria-label="First">
+                                    <span aria-hidden="true">&laquo;&laquo;</span>
+                                </a>
+                            </li>
+                            
+                            <li class="page-item <?php echo $current_page == 1 ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="<?php echo getPageUrl($current_page - 1, $search, $filter_equipment_status); ?>" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+
+                            <?php
+                            $start_page = max(1, $current_page - 2);
+                            $end_page = min($total_pages, $current_page + 2);
+                            
+                            if ($start_page > 1) {
+                                echo '<li class="page-item"><a class="page-link" href="' . getPageUrl(1, $search, $filter_equipment_status) . '">1</a></li>';
+                                if ($start_page > 2) {
+                                    echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                                }
+                            }
+                            
+                            for ($i = $start_page; $i <= $end_page; $i++) {
+                                $active = $i == $current_page ? 'active' : '';
+                                echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . getPageUrl($i, $search, $filter_equipment_status) . '">' . $i . '</a></li>';
+                            }
+                            
+                            if ($end_page < $total_pages) {
+                                if ($end_page < $total_pages - 1) {
+                                    echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                                }
+                                echo '<li class="page-item"><a class="page-link" href="' . getPageUrl($total_pages, $search, $filter_equipment_status) . '">' . $total_pages . '</a></li>';
+                            }
+                            ?>
+
+                            <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="<?php echo getPageUrl($current_page + 1, $search, $filter_equipment_status); ?>" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            
+                            <li class="page-item <?php echo $current_page == $total_pages ? 'disabled' : ''; ?>">
+                                <a class="page-link" href="<?php echo getPageUrl($total_pages, $search, $filter_equipment_status); ?>" aria-label="Last">
+                                    <span aria-hidden="true">&raquo;&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 </main>
 
-<!-- Equipment Modal -->
+<!-- Modal สำหรับเพิ่ม/แก้ไขครุภัณฑ์ -->
 <div class="modal fade" id="equipmentModal" tabindex="-1" aria-labelledby="equipmentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="equipmentModalLabel">เพิ่มครุภัณฑ์</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="POST" id="equipmentForm" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="equipmentForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="equipmentModalLabel">เพิ่มครุภัณฑ์</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
                 <div class="modal-body">
                     <input type="hidden" name="equipment_id" id="equipment_id">
                     <input type="hidden" name="current_equipment_image" id="current_equipment_image">
                     
                     <div class="row">
-                        <div class="col-md-8">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">รหัสครุภัณฑ์ *</label>
-                                    <input type="text" class="form-control" name="equipment_code" id="equipment_code" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">ชื่อครุภัณฑ์ *</label>
-                                    <input type="text" class="form-control" name="equipment_name" id="equipment_name" required>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">หมวดหมู่หลัก *</label>
-                                    <select class="form-control" name="category_id" id="category_id" required onchange="loadSubcategories(this.value)">
-                                        <option value="">เลือกหมวดหมู่หลัก</option>
-                                        <?php foreach($categories as $category): ?>
-                                        <option value="<?php echo $category['id']; ?>">
-                                            <?php echo $category['category_name']; ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">หมวดหมู่ย่อย</label>
-                                    <select class="form-control" name="subcategory_id" id="subcategory_id">
-                                        <option value="">เลือกหมวดหมู่ย่อย</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">ยี่ห้อ</label>
-                                    <input type="text" class="form-control" name="brand_name" id="brand_name">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">รุ่น</label>
-                                    <input type="text" class="form-control" name="model_name" id="model_name">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">หมายเลขซีเรียล</label>
-                                    <input type="text" class="form-control" name="serial_number" id="serial_number">
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">วันที่จัดซื้อ</label>
-                                    <input type="date" class="form-control" name="purchase_date" id="purchase_date">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">วันที่หมดประกัน</label>
-                                    <input type="date" class="form-control" name="warranty_expiry_date" id="warranty_expiry_date">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">ราคาจัดซื้อ (บาท)</label>
-                                    <input type="number" step="0.01" class="form-control" name="purchase_price" id="purchase_price">
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">ผู้จัดจำหน่าย</label>
-                                    <input type="text" class="form-control" name="supplier_name" id="supplier_name">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">ผู้รับผิดชอบ</label>
-                                    <input type="text" class="form-control" name="responsible_person" id="responsible_person">
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">สถานะ *</label>
-                                    <select class="form-control" name="equipment_status" id="equipment_status" required>
-                                        <option value="ใหม่">ใหม่</option>
-                                        <option value="ใช้งานปกติ" selected>ใช้งานปกติ</option>
-                                        <option value="ชำรุด">ชำรุด</option>
-                                        <option value="กำลังซ่อม">กำลังซ่อม</option>
-                                        <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
-                                        <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- ข้อมูลตำแหน่งที่ตั้ง - แก้ไขให้ใช้ dropdown -->
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">โรงเรียน *</label>
-                                    <select class="form-control" name="location_school" id="location_school" required onchange="loadBuildings(this.value)">
-                                        <option value="">เลือกโรงเรียน</option>
-                                        <option value="โรงเรียนวารีเชียงใหม่">โรงเรียนวารีเชียงใหม่</option>
-                                        <option value="โรงเรียนอนุบาลวารีเชียงใหม่">โรงเรียนอนุบาลวารีเชียงใหม่</option>
-                                        <option value="โรงเรียนนานาชาติวารีเชียงใหม่">โรงเรียนนานาชาติวารีเชียงใหม่</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">ตึก/อาคาร *</label>
-                                    <select class="form-control" name="location_building" id="location_building" required onchange="loadFloors(this.value)">
-                                        <option value="">เลือกตึก/อาคาร</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">ชั้น *</label>
-                                    <select class="form-control" name="location_floor" id="location_floor" required>
-                                        <option value="">เลือกชั้น</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">ห้อง</label>
-                                    <input type="text" class="form-control" name="location_room" id="location_room">
-                                </div>
-                            </div>
-                            
+                        <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">หมายเหตุ</label>
-                                <textarea class="form-control" name="notes" id="notes" rows="3"></textarea>
+                                <label class="form-label">รหัสครุภัณฑ์ <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="equipment_code" id="equipment_code" required>
                             </div>
                         </div>
-                        
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">รูปภาพครุภัณฑ์</label>
-                                <input type="file" class="form-control" name="equipment_image" id="equipment_image" accept="image/*" onchange="previewImage(event)">
-                                <small class="text-muted">รองรับไฟล์: JPG, JPEG, PNG, GIF, WEBP (สูงสุด 5MB)</small>
-                            </div>
-                            <div class="text-center">
-                                <img id="imagePreview" src="" alt="Image Preview" class="img-fluid rounded border" style="max-height: 300px; display: none;">
-                                <div id="noImagePlaceholder" class="border rounded p-5 bg-light">
-                                    <i class="fas fa-image fa-3x text-muted"></i>
-                                    <p class="text-muted mt-2 mb-0">ไม่มีรูปภาพ</p>
-                                </div>
+                                <label class="form-label">ชื่อครุภัณฑ์ <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="equipment_name" id="equipment_name" required>
                             </div>
                         </div>
                     </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">หมวดหมู่ <span class="text-danger">*</span></label>
+                                <select class="form-control" name="category_id" id="category_id" required onchange="updateSubcategories()">
+                                    <option value="">เลือกหมวดหมู่</option>
+                                    <?php foreach($categories as $category): ?>
+                                        <option value="<?php echo $category['id']; ?>"><?php echo $category['category_name']; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">หมวดหมู่ย่อย</label>
+                                <select class="form-control" name="subcategory_id" id="subcategory_id">
+                                    <option value="">เลือกหมวดหมู่ย่อย</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ยี่ห้อ</label>
+                                <input type="text" class="form-control" name="brand_name" id="brand_name">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">รุ่น</label>
+                                <input type="text" class="form-control" name="model_name" id="model_name">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">หมายเลขซีเรียล</label>
+                                <input type="text" class="form-control" name="serial_number" id="serial_number">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">สถานะครุภัณฑ์ <span class="text-danger">*</span></label>
+                                <select class="form-control" name="equipment_status" id="equipment_status" required>
+                                    <option value="ใหม่">ใหม่</option>
+                                    <option value="ใช้งานปกติ">ใช้งานปกติ</option>
+                                    <option value="ชำรุด">ชำรุด</option>
+                                    <option value="กำลังซ่อม">กำลังซ่อม</option>
+                                    <option value="ซ่อมเสร็จแล้ว">ซ่อมเสร็จแล้ว</option>
+                                    <option value="จำหน่ายแล้ว">จำหน่ายแล้ว</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">วันที่ซื้อ</label>
+                                <input type="date" class="form-control" name="purchase_date" id="purchase_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">วันที่หมดประกัน</label>
+                                <input type="date" class="form-control" name="warranty_expiry_date" id="warranty_expiry_date">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ราคาซื้อ</label>
+                                <input type="number" step="0.01" class="form-control" name="purchase_price" id="purchase_price">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ผู้จำหน่าย</label>
+                                <input type="text" class="form-control" name="supplier_name" id="supplier_name">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">โรงเรียน</label>
+                                <input type="text" class="form-control" name="location_school" id="location_school">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ตึก/อาคาร</label>
+                                <input type="text" class="form-control" name="location_building" id="location_building">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ชั้น</label>
+                                <input type="text" class="form-control" name="location_floor" id="location_floor">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ห้อง</label>
+                                <input type="text" class="form-control" name="location_room" id="location_room">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ผู้รับผิดชอบ</label>
+                                <input type="text" class="form-control" name="responsible_person" id="responsible_person">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">รูปภาพครุภัณฑ์</label>
+                                <input type="file" class="form-control" name="equipment_image" id="equipment_image" accept="image/*">
+                                <div class="form-text">รองรับไฟล์ JPG, JPEG, PNG, GIF, WEBP ขนาดไม่เกิน 5MB</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">หมายเหตุ</label>
+                        <textarea class="form-control" name="notes" id="notes" rows="3"></textarea>
+                    </div>
+
+                    <div id="imagePreview" class="mb-3 text-center"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
-                    <button type="submit" class="btn btn-primary" name="add_equipment" id="submitButton">บันทึกข้อมูล</button>
+                    <button type="submit" class="btn btn-primary" name="add_equipment" id="submitButton">บันทึก</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- View Modal -->
+<!-- Modal สำหรับดูรายละเอียดครุภัณฑ์ -->
 <div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -739,7 +1078,7 @@ include 'includes/sidebar.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="viewModalBody">
-                <!-- ข้อมูลจะถูกเติมด้วย JavaScript -->
+                <!-- เนื้อหาจะถูกใส่โดย JavaScript -->
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
@@ -748,257 +1087,554 @@ include 'includes/sidebar.php';
     </div>
 </div>
 
-<script>
-// ข้อมูลโรงเรียน ตึก และชั้น
-const schoolData = {
-    "โรงเรียนวารีเชียงใหม่": {
-        buildings: [
-            { name: "อาคาร1-อำนวยการ", floors: ["ชั้น 1", "ชั้น 2"] },
-            { name: "อาคาร3-ประถม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4"] },
-            { name: "อาคาร4-ประถม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3"] },
-            { name: "อาคาร4-มัธยม", floors: ["ชั้น 3", "ชั้น 4", "ชั้น 5"] },
-            { name: "อาคาร5-อนุบาล", floors: ["ชั้น 1", "ชั้น 2"] },
-            { name: "อาคาร6-??", floors: ["ชั้น 1", "ชั้น 2"] },
-            { name: "อาคาร7-มัธยม", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4", "ชั้น 5", "ชั้น 6", "ชั้น 7"] },
-            { name: "อาคาร 10", floors: ["ชั้น 1", "ชั้น 2"] }
-        ]
-    },
-    "โรงเรียนอนุบาลวารีเชียงใหม่": {
-        buildings: [
-            { name: "อาคาร 1-อำนวยการ", floors: ["ชั้น 1", "ชั้น 2"] },
-            { name: "อาคาร-อนุบาล", floors: ["ชั้น 1", "ชั้น 2"] }
-        ]
-    },
-    "โรงเรียนนานาชาติวารีเชียงใหม่": {
-        buildings: [
-            { name: "อาคาร 8", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3", "ชั้น 4"] },
-            { name: "อาคาร 9", floors: ["ชั้น 1", "ชั้น 2", "ชั้น 3"] },
-            { name: "อาคาร 10", floors: ["ชั้น 1", "ชั้น 2"] }
-        ]
-    }
-};
+<?php include 'includes/footer.php'; ?>
 
-// เก็บข้อมูลหมวดหมู่ย่อยทั้งหมดจาก PHP
-const allSubcategories = <?php echo json_encode($subcategories_all); ?>;
+<script>
+// เก็บข้อมูลหมวดหมู่ย่อยทั้งหมด
+const subcategories = <?php echo json_encode($subcategories_all); ?>;
+
+function updateSubcategories() {
+    const categoryId = document.getElementById('category_id').value;
+    const subcategorySelect = document.getElementById('subcategory_id');
+    
+    // ล้างตัวเลือกทั้งหมดยกเว้นตัวเลือกแรก
+    subcategorySelect.innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
+    
+    if (categoryId) {
+        // กรองหมวดหมู่ย่อยตามหมวดหมู่ที่เลือก
+        const filteredSubcategories = subcategories.filter(sub => sub.category_id == categoryId);
+        
+        filteredSubcategories.forEach(sub => {
+            const option = document.createElement('option');
+            option.value = sub.id;
+            option.textContent = sub.subcategory_name;
+            subcategorySelect.appendChild(option);
+        });
+    }
+}
 
 function clearForm() {
     document.getElementById('equipmentForm').reset();
     document.getElementById('equipment_id').value = '';
     document.getElementById('current_equipment_image').value = '';
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('equipmentModalLabel').textContent = 'เพิ่มครุภัณฑ์';
     document.getElementById('submitButton').name = 'add_equipment';
-    document.getElementById('equipmentModalLabel').innerText = 'เพิ่มครุภัณฑ์';
-    document.getElementById('imagePreview').style.display = 'none';
-    document.getElementById('noImagePlaceholder').style.display = 'block';
+    document.getElementById('submitButton').textContent = 'บันทึก';
+    
+    // รีเซ็ตหมวดหมู่ย่อย
     document.getElementById('subcategory_id').innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
-    document.getElementById('location_building').innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
-    document.getElementById('location_floor').innerHTML = '<option value="">เลือกชั้น</option>';
 }
 
 function editEquipment(equipment) {
-    document.getElementById('equipmentModalLabel').innerText = 'แก้ไขครุภัณฑ์';
+    document.getElementById('equipmentModalLabel').textContent = 'แก้ไขครุภัณฑ์';
     document.getElementById('submitButton').name = 'edit_equipment';
+    document.getElementById('submitButton').textContent = 'อัพเดต';
     
-    // เติมข้อมูลในฟอร์ม
+    // ตั้งค่าฟิลด์ต่างๆ
     document.getElementById('equipment_id').value = equipment.id;
     document.getElementById('equipment_code').value = equipment.equipment_code;
     document.getElementById('equipment_name').value = equipment.equipment_name;
     document.getElementById('category_id').value = equipment.category_id;
+    
+    // อัพเดตหมวดหมู่ย่อยตามหมวดหมู่ที่เลือก
+    updateSubcategories();
+    
+    // ตั้งค่าหมวดหมู่ย่อยหลังจากอัพเดตตัวเลือกแล้ว
+    setTimeout(() => {
+        document.getElementById('subcategory_id').value = equipment.subcategory_id;
+    }, 100);
+    
     document.getElementById('brand_name').value = equipment.brand_name || '';
     document.getElementById('model_name').value = equipment.model_name || '';
     document.getElementById('serial_number').value = equipment.serial_number || '';
+    document.getElementById('equipment_status').value = equipment.equipment_status;
     document.getElementById('purchase_date').value = equipment.purchase_date || '';
     document.getElementById('warranty_expiry_date').value = equipment.warranty_expiry_date || '';
     document.getElementById('purchase_price').value = equipment.purchase_price || '';
     document.getElementById('supplier_name').value = equipment.supplier_name || '';
-    document.getElementById('equipment_status').value = equipment.equipment_status;
     document.getElementById('location_school').value = equipment.location_school || '';
+    document.getElementById('location_building').value = equipment.location_building || '';
+    document.getElementById('location_floor').value = equipment.location_floor || '';
     document.getElementById('location_room').value = equipment.location_room || '';
     document.getElementById('responsible_person').value = equipment.responsible_person || '';
     document.getElementById('notes').value = equipment.notes || '';
     document.getElementById('current_equipment_image').value = equipment.image_path || '';
     
-    // โหลดหมวดหมู่ย่อย
-    if (equipment.category_id) {
-        loadSubcategories(equipment.category_id, equipment.subcategory_id);
-    }
-    
-    // โหลดข้อมูลตึกและชั้น (ถ้ามีข้อมูลโรงเรียน)
-    if (equipment.location_school) {
-        loadBuildings(equipment.location_school, equipment.location_building, equipment.location_floor);
-    }
-    
-    // แสดงรูปภาพ
+    // แสดงรูปภาพถ้ามี
+    const imagePreview = document.getElementById('imagePreview');
+    imagePreview.innerHTML = '';
     if (equipment.image_path) {
-        document.getElementById('imagePreview').src = 'uploads/img_equipment/' + equipment.image_path;
-        document.getElementById('imagePreview').style.display = 'block';
-        document.getElementById('noImagePlaceholder').style.display = 'none';
-    } else {
-        document.getElementById('imagePreview').style.display = 'none';
-        document.getElementById('noImagePlaceholder').style.display = 'block';
-    }
-}
-
-function loadSubcategories(categoryId, selectedSubcategoryId = null) {
-    if (!categoryId) {
-        document.getElementById('subcategory_id').innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
-        return;
-    }
-    
-    const subcategorySelect = document.getElementById('subcategory_id');
-    subcategorySelect.innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
-    
-    // กรองหมวดหมู่ย่อยตาม category_id
-    const filteredSubcategories = allSubcategories.filter(sub => sub.category_id == categoryId);
-    
-    filteredSubcategories.forEach(subcategory => {
-        const option = document.createElement('option');
-        option.value = subcategory.id;
-        option.textContent = subcategory.subcategory_name;
-        if (selectedSubcategoryId && subcategory.id == selectedSubcategoryId) {
-            option.selected = true;
-        }
-        subcategorySelect.appendChild(option);
-    });
-}
-
-function loadBuildings(schoolName, selectedBuilding = null, selectedFloor = null) {
-    const buildingSelect = document.getElementById('location_building');
-    const floorSelect = document.getElementById('location_floor');
-    
-    // รีเซ็ต dropdown
-    buildingSelect.innerHTML = '<option value="">เลือกตึก/อาคาร</option>';
-    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
-    
-    if (!schoolName || !schoolData[schoolName]) {
-        return;
-    }
-    
-    // เติมข้อมูลตึก/อาคาร
-    schoolData[schoolName].buildings.forEach(building => {
-        const option = document.createElement('option');
-        option.value = building.name;
-        option.textContent = building.name;
-        if (selectedBuilding && building.name === selectedBuilding) {
-            option.selected = true;
-        }
-        buildingSelect.appendChild(option);
-    });
-    
-    // ถ้ามีการเลือกตึกอยู่แล้ว ให้โหลดชั้นด้วย
-    if (selectedBuilding) {
-        loadFloors(selectedBuilding, selectedFloor);
-    }
-}
-
-function loadFloors(buildingName, selectedFloor = null) {
-    const floorSelect = document.getElementById('location_floor');
-    const schoolSelect = document.getElementById('location_school');
-    const schoolName = schoolSelect.value;
-    
-    floorSelect.innerHTML = '<option value="">เลือกชั้น</option>';
-    
-    if (!schoolName || !buildingName || !schoolData[schoolName]) {
-        return;
-    }
-    
-    // หาข้อมูลตึกที่เลือก
-    const building = schoolData[schoolName].buildings.find(b => b.name === buildingName);
-    
-    if (building) {
-        // เติมข้อมูลชั้น
-        building.floors.forEach(floor => {
-            const option = document.createElement('option');
-            option.value = floor;
-            option.textContent = floor;
-            if (selectedFloor && floor === selectedFloor) {
-                option.selected = true;
-            }
-            floorSelect.appendChild(option);
-        });
-    }
-}
-
-function previewImage(event) {
-    const input = event.target;
-    const preview = document.getElementById('imagePreview');
-    const placeholder = document.getElementById('noImagePlaceholder');
-    
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-            placeholder.style.display = 'none';
-        }
-        reader.readAsDataURL(input.files[0]);
-    } else {
-        preview.style.display = 'none';
-        placeholder.style.display = 'block';
+        const img = document.createElement('img');
+        img.src = 'uploads/img_equipment/' + equipment.image_path;
+        img.alt = 'รูปครุภัณฑ์';
+        img.style.maxWidth = '200px';
+        img.style.maxHeight = '200px';
+        img.className = 'img-thumbnail';
+        imagePreview.appendChild(img);
     }
 }
 
 function viewEquipment(equipment) {
     const modalBody = document.getElementById('viewModalBody');
     
-    let imageHtml = '';
+    let content = `
+        <div class="row">
+            <div class="col-md-4 text-center mb-3">
+    `;
+    
     if (equipment.image_path) {
-        imageHtml = `
-            <div class="text-center mb-4">
-                <img src="uploads/img_equipment/${equipment.image_path}" alt="รูปภาพครุภัณฑ์" class="img-fluid rounded" style="max-height: 300px;">
+        content += `
+            <img src="uploads/img_equipment/${equipment.image_path}" 
+                 alt="รูปครุภัณฑ์" 
+                 class="img-fluid rounded shadow-sm"
+                 style="max-height: 200px;">
+        `;
+    } else {
+        content += `
+            <div class="text-muted">
+                <i class="fas fa-image fa-3x mb-2"></i>
+                <br>ไม่มีรูปภาพ
             </div>
         `;
     }
     
-    modalBody.innerHTML = `
-        ${imageHtml}
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="fw-bold">ข้อมูลพื้นฐาน</h6>
-                <table class="table table-sm">
-                    <tr><td width="40%"><strong>รหัสครุภัณฑ์:</strong></td><td>${equipment.equipment_code}</td></tr>
-                    <tr><td><strong>ชื่อครุภัณฑ์:</strong></td><td>${equipment.equipment_name}</td></tr>
-                    <tr><td><strong>หมวดหมู่:</strong></td><td>${equipment.category_name || '-'}</td></tr>
-                    <tr><td><strong>หมวดหมู่ย่อย:</strong></td><td>${equipment.subcategory_name || '-'}</td></tr>
-                    <tr><td><strong>ยี่ห้อ/รุ่น:</strong></td><td>${(equipment.brand_name || '') + ' ' + (equipment.model_name || '') || '-'}</td></tr>
-                    <tr><td><strong>หมายเลขซีเรียล:</strong></td><td>${equipment.serial_number || '-'}</td></tr>
-                </table>
+    content += `
             </div>
-            <div class="col-md-6">
-                <h6 class="fw-bold">ข้อมูลการจัดซื้อ</h6>
-                <table class="table table-sm">
-                    <tr><td width="40%"><strong>วันที่จัดซื้อ:</strong></td><td>${equipment.purchase_date ? new Date(equipment.purchase_date).toLocaleDateString('th-TH') : '-'}</td></tr>
-                    <tr><td><strong>วันที่หมดประกัน:</strong></td><td>${equipment.warranty_expiry_date ? new Date(equipment.warranty_expiry_date).toLocaleDateString('th-TH') : '-'}</td></tr>
-                    <tr><td><strong>ราคาจัดซื้อ:</strong></td><td>${equipment.purchase_price ? parseFloat(equipment.purchase_price).toLocaleString('th-TH', {minimumFractionDigits: 2}) + ' บาท' : '-'}</td></tr>
-                    <tr><td><strong>ผู้จัดจำหน่าย:</strong></td><td>${equipment.supplier_name || '-'}</td></tr>
+            <div class="col-md-8">
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="40%">รหัสครุภัณฑ์</th>
+                        <td>${equipment.equipment_code}</td>
+                    </tr>
+                    <tr>
+                        <th>ชื่อครุภัณฑ์</th>
+                        <td>${equipment.equipment_name}</td>
+                    </tr>
+                    <tr>
+                        <th>หมวดหมู่</th>
+                        <td>${equipment.category_name || '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>หมวดหมู่ย่อย</th>
+                        <td>${equipment.subcategory_name || '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>ยี่ห้อ/รุ่น</th>
+                        <td>${equipment.brand_name || '-'} / ${equipment.model_name || '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>หมายเลขซีเรียล</th>
+                        <td>${equipment.serial_number || '-'}</td>
+                    </tr>
                 </table>
             </div>
         </div>
         
         <div class="row mt-3">
             <div class="col-md-6">
-                <h6 class="fw-bold">สถานะและตำแหน่ง</h6>
-                <table class="table table-sm">
-                    <tr><td width="40%"><strong>สถานะ:</strong></td><td><span class="badge bg-primary">${equipment.equipment_status}</span></td></tr>
-                    <tr><td><strong>โรงเรียน:</strong></td><td>${equipment.location_school || '-'}</td></tr>
-                    <tr><td><strong>ตึก/อาคาร:</strong></td><td>${equipment.location_building || '-'}</td></tr>
-                    <tr><td><strong>ชั้น:</strong></td><td>${equipment.location_floor || '-'}</td></tr>
-                    <tr><td><strong>ห้อง:</strong></td><td>${equipment.location_room || '-'}</td></tr>
-                    <tr><td><strong>ผู้รับผิดชอบ:</strong></td><td>${equipment.responsible_person || '-'}</td></tr>
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="40%">สถานะครุภัณฑ์</th>
+                        <td>
+                            <span class="badge bg-${getStatusBadgeColor(equipment.equipment_status)}">
+                                ${equipment.equipment_status}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>วันที่ซื้อ</th>
+                        <td>${equipment.purchase_date ? formatDate(equipment.purchase_date) : '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>วันที่หมดประกัน</th>
+                        <td>${equipment.warranty_expiry_date ? formatDate(equipment.warranty_expiry_date) : '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>ราคาซื้อ</th>
+                        <td>${equipment.purchase_price ? formatCurrency(equipment.purchase_price) : '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>ผู้จำหน่าย</th>
+                        <td>${equipment.supplier_name || '-'}</td>
+                    </tr>
                 </table>
             </div>
             <div class="col-md-6">
-                <h6 class="fw-bold">ข้อมูลเพิ่มเติม</h6>
-                <table class="table table-sm">
-                    <tr><td width="40%"><strong>วันที่สร้าง:</strong></td><td>${equipment.created_at ? new Date(equipment.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td></tr>
-                    <tr><td><strong>วันที่แก้ไขล่าสุด:</strong></td><td>${equipment.updated_at ? new Date(equipment.updated_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}</td></tr>
-                    <tr><td><strong>หมายเหตุ:</strong></td><td>${equipment.notes || '-'}</td></tr>
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="40%">ตำแหน่งที่ตั้ง</th>
+                        <td>
+                            ${[equipment.location_building, equipment.location_floor ? 'ชั้น ' + equipment.location_floor : '', equipment.location_room].filter(Boolean).join(' / ') || '-'}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>โรงเรียน</th>
+                        <td>${equipment.location_school || '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>ผู้รับผิดชอบ</th>
+                        <td>${equipment.responsible_person || '-'}</td>
+                    </tr>
+                    <tr>
+                        <th>สถานะซ่อม</th>
+                        <td>
+                            <span class="badge bg-${getRepairStatusBadgeColor(equipment.repair_status)}">
+                                ${equipment.repair_status || 'ไม่มี'}
+                            </span>
+                        </td>
+                    </tr>
                 </table>
             </div>
         </div>
     `;
+    
+    if (equipment.notes) {
+        content += `
+            <div class="row mt-3">
+                <div class="col-12">
+                    <strong>หมายเหตุ:</strong>
+                    <div class="border p-2 rounded bg-light">${equipment.notes}</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    modalBody.innerHTML = content;
 }
-</script>
 
-<?php
-require_once 'includes/footer.php';
-?>
+function getStatusBadgeColor(status) {
+    const colors = {
+        'ใหม่': 'success',
+        'ใช้งานปกติ': 'primary',
+        'ชำรุด': 'warning',
+        'กำลังซ่อม': 'info',
+        'ซ่อมเสร็จแล้ว': 'success',
+        'จำหน่ายแล้ว': 'dark'
+    };
+    return colors[status] || 'secondary';
+}
+
+function getRepairStatusBadgeColor(status) {
+    const colors = {
+        'รอซ่อม': 'warning',
+        'กำลังดำเนินการ': 'info',
+        'ซ่อมเสร็จ': 'success',
+        'ยกเลิก': 'danger'
+    };
+    return colors[status] || 'secondary';
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('th-TH');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('th-TH', {
+        style: 'currency',
+        currency: 'THB'
+    }).format(amount);
+}
+
+// แสดงตัวอย่างรูปภาพก่อนอัพโหลด
+document.getElementById('equipment_image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const preview = document.getElementById('imagePreview');
+    
+    preview.innerHTML = '';
+    
+    if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+            alert('ขนาดไฟล์ต้องไม่เกิน 5MB');
+            e.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = 'ตัวอย่างรูปภาพ';
+            img.style.maxWidth = '200px';
+            img.style.maxHeight = '200px';
+            img.className = 'img-thumbnail';
+            preview.appendChild(img);
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+// ป้องกันการส่งฟอร์มถ้ามีข้อผิดพลาด
+document.getElementById('equipmentForm').addEventListener('submit', function(e) {
+    const equipmentCode = document.getElementById('equipment_code').value.trim();
+    const equipmentName = document.getElementById('equipment_name').value.trim();
+    const categoryId = document.getElementById('category_id').value;
+    
+    if (!equipmentCode || !equipmentName || !categoryId) {
+        e.preventDefault();
+        alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+        return;
+    }
+});
+
+// ==================== ฟังก์ชันใหม่สำหรับการกรองข้อมูล ====================
+
+// อัพเดตเวลาปัจจุบัน
+function updateCurrentTime() {
+    const now = new Date();
+    const options = { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        timeZone: 'Asia/Bangkok'
+    };
+    const formatter = new Intl.DateTimeFormat('th-TH', options);
+    document.getElementById('currentTime').textContent = 'อัพเดตล่าสุด: ' + formatter.format(now);
+}
+
+// เรียกอัพเดตเวลาทุก 1 นาที
+setInterval(updateCurrentTime, 60000);
+updateCurrentTime(); // เรียกครั้งแรก
+
+// ฟังก์ชันกรองข้อมูลแบบ real-time
+function filterTable() {
+    const globalSearch = document.getElementById('globalSearch').value.toLowerCase();
+    const equipmentStatus = document.getElementById('equipmentStatusFilter').value;
+    const repairStatus = document.getElementById('repairStatusFilter').value;
+    const school = document.getElementById('schoolFilter').value;
+    
+    const rows = document.querySelectorAll('#equipmentTableBody .equipment-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const code = row.getAttribute('data-code').toLowerCase();
+        const name = row.getAttribute('data-name').toLowerCase();
+        const category = row.getAttribute('data-category').toLowerCase();
+        const subcategory = row.getAttribute('data-subcategory').toLowerCase();
+        const status = row.getAttribute('data-status');
+        const repair = row.getAttribute('data-repair-status');
+        const schoolData = row.getAttribute('data-school');
+        const building = row.getAttribute('data-building').toLowerCase();
+        const room = row.getAttribute('data-room').toLowerCase();
+        
+        let showRow = true;
+        
+        // กรองด้วยช่องค้นหาทั่วไป
+        if (globalSearch) {
+            const searchText = globalSearch;
+            if (!code.includes(searchText) && 
+                !name.includes(searchText) && 
+                !category.includes(searchText) && 
+                !subcategory.includes(searchText) &&
+                !building.includes(searchText) &&
+                !room.includes(searchText)) {
+                showRow = false;
+            }
+        }
+        
+        // กรองด้วยสถานะครุภัณฑ์
+        if (equipmentStatus && status !== equipmentStatus) {
+            showRow = false;
+        }
+        
+        // กรองด้วยสถานะซ่อม
+        if (repairStatus && repair !== repairStatus) {
+            showRow = false;
+        }
+        
+        // กรองด้วยโรงเรียน
+        if (school && schoolData !== school) {
+            showRow = false;
+        }
+        
+        // แสดง/ซ่อนแถว
+        if (showRow) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // อัพเดตจำนวนผลลัพธ์
+    updateResultCount(visibleCount, rows.length);
+    
+    // แสดงข้อความเมื่อไม่พบผลลัพธ์
+    showNoResultsMessage(visibleCount);
+}
+
+// อัพเดตจำนวนผลลัพธ์
+function updateResultCount(visible, total) {
+    const totalCount = document.getElementById('totalCount');
+    const showingCount = document.getElementById('showingCount');
+    
+    totalCount.textContent = total.toLocaleString();
+    showingCount.textContent = visible.toLocaleString();
+    
+    // เปลี่ยนสีข้อความตามจำนวนผลลัพธ์
+    const resultCount = document.getElementById('resultCount');
+    if (visible === 0) {
+        resultCount.className = 'alert alert-danger py-2 mb-0';
+    } else if (visible < total) {
+        resultCount.className = 'alert alert-warning py-2 mb-0';
+    } else {
+        resultCount.className = 'alert alert-info py-2 mb-0';
+    }
+}
+
+// แสดงข้อความเมื่อไม่พบผลลัพธ์
+function showNoResultsMessage(visibleCount) {
+    let noResultsRow = document.querySelector('#equipmentTableBody tr:not(.equipment-row)');
+    
+    if (visibleCount === 0) {
+        if (!noResultsRow) {
+            noResultsRow = document.createElement('tr');
+            noResultsRow.innerHTML = `
+                <td colspan="8" class="text-center py-4">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์ที่ตรงกับเงื่อนไขการค้นหา</h5>
+                    <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
+                    <button type="button" class="btn btn-primary" onclick="clearFilters()">
+                        ล้างตัวกรองทั้งหมด
+                    </button>
+                </td>
+            `;
+            document.getElementById('equipmentTableBody').appendChild(noResultsRow);
+        }
+    } else if (noResultsRow) {
+        noResultsRow.remove();
+    }
+}
+
+// ล้างตัวกรองทั้งหมด
+function clearFilters() {
+    document.getElementById('globalSearch').value = '';
+    document.getElementById('equipmentStatusFilter').value = '';
+    document.getElementById('repairStatusFilter').value = '';
+    document.getElementById('schoolFilter').value = '';
+    
+    filterTable();
+}
+
+// ส่งออกข้อมูลเป็น Excel
+function exportToExcel() {
+    const table = document.getElementById('equipmentTable');
+    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
+    
+    if (rows.length === 0) {
+        alert('ไม่มีข้อมูลที่จะส่งออก');
+        return;
+    }
+    
+    let csv = [];
+    const headers = [];
+    
+    // เพิ่มหัวข้อ
+    table.querySelectorAll('thead th').forEach(header => {
+        headers.push(header.textContent.trim());
+    });
+    csv.push(headers.join(','));
+    
+    // เพิ่มข้อมูล
+    rows.forEach(row => {
+        const rowData = [];
+        row.querySelectorAll('td').forEach(cell => {
+            let text = cell.textContent.trim();
+            
+            // ลบ HTML tags และจัดการกับเครื่องหมาย comma
+            text = text.replace(/,/g, ';');
+            text = text.replace(/\n/g, ' ');
+            
+            // ลบ badge text
+            const badge = cell.querySelector('.badge');
+            if (badge) {
+                text = badge.textContent.trim();
+            }
+            
+            rowData.push(text);
+        });
+        csv.push(rowData.join(','));
+    });
+    
+    // สร้างไฟล์และดาวน์โหลด
+    const csvString = csv.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `ครุภัณฑ์_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// พิมพ์ตาราง
+function printTable() {
+    const table = document.getElementById('equipmentTable');
+    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
+    
+    if (rows.length === 0) {
+        alert('ไม่มีข้อมูลที่จะพิมพ์');
+        return;
+    }
+    
+    const printWindow = window.open('', '_blank');
+    const currentDate = new Date().toLocaleDateString('th-TH');
+    
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>รายงานครุภัณฑ์</title>
+                <style>
+                    body { font-family: 'Sarabun', sans-serif; margin: 20px; }
+                    .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                    .print-header h2 { margin: 0; color: #333; }
+                    .print-info { margin: 10px 0; font-size: 14px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f8f9fa; font-weight: bold; }
+                    tr:nth-child(even) { background-color: #f8f9fa; }
+                    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+                    .no-print { display: none; }
+                    @media print {
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h2>รายงานครุภัณฑ์</h2>
+                    <div class="print-info">
+                        <strong>วันที่พิมพ์:</strong> ${currentDate} | 
+                        <strong>จำนวนรายการ:</strong> ${rows.length} รายการ
+                    </div>
+                </div>
+                ${table.outerHTML}
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(function() {
+                            window.close();
+                        }, 500);
+                    }
+                <\/script>
+            </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+}
+
+// เรียกใช้ฟังก์ชันกรองเมื่อโหลดหน้าเว็บเสร็จ
+document.addEventListener('DOMContentLoaded', function() {
+    filterTable(); // กรองข้อมูลครั้งแรก
+});
+</script>
