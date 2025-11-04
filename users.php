@@ -1,6 +1,10 @@
 <?php
 require_once 'includes/header.php';
 
+// ตรวจสอบสิทธิ์การเข้าถึง - อนุญาตเฉพาะ admin
+require_once 'includes/auth_check.php';
+checkPermission(['admin']);
+
 // CRUD Operations
 if (isset($_GET['action'])) {
     $action = $_GET['action'];
@@ -95,9 +99,11 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
 
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">จัดการข้อมูลผู้ใช้</h1>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="clearForm()">
-            <i class="fas fa-plus"></i> เพิ่มผู้ใช้
-        </button>
+        <?php if (hasPermission(['admin'])): ?>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="clearForm()">
+                <i class="fas fa-plus"></i> เพิ่มผู้ใช้
+            </button>
+        <?php endif; ?>
     </div>
 
     <?php if (isset($_SESSION['success'])): ?>
@@ -130,7 +136,9 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
                             <th>สิทธิ์การใช้งาน</th>
                             <th>สถานะ</th>
                             <th>เข้าใช้ล่าสุด</th>
-                            <th>จัดการ</th>
+                            <?php if (hasPermission(['admin'])): ?>
+                                <th>จัดการ</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -168,21 +176,23 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
                                 </span>
                             </td>
                             <td><?php echo $user['last_login'] ? date('d/m/Y H:i', strtotime($user['last_login'])) : 'ยังไม่เคยเข้าใช้'; ?></td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                        <a href="users.php?action=toggle_active&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-<?php echo $user['is_active'] ? 'warning' : 'success'; ?>" title="<?php echo $user['is_active'] ? 'ปิดใช้งาน' : 'เปิดใช้งาน'; ?>">
-                                            <i class="fas fa-<?php echo $user['is_active'] ? 'pause' : 'play'; ?>"></i>
-                                        </a>
-                                        <a href="users.php?action=delete&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
+                            <?php if (hasPermission(['admin'])): ?>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='editUser(<?php echo json_encode($user); ?>)'>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <?php if ($user['id'] != $_SESSION['user_id']): ?>
+                                            <a href="users.php?action=toggle_active&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-<?php echo $user['is_active'] ? 'warning' : 'success'; ?>" title="<?php echo $user['is_active'] ? 'ปิดใช้งาน' : 'เปิดใช้งาน'; ?>">
+                                                <i class="fas fa-<?php echo $user['is_active'] ? 'pause' : 'play'; ?>"></i>
+                                            </a>
+                                            <a href="users.php?action=delete&id=<?php echo $user['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('คุณแน่ใจหรือไม่?')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -193,6 +203,7 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
 </main>
 
 <!-- User Modal -->
+<?php if (hasPermission(['admin'])): ?>
 <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -242,6 +253,7 @@ $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 function clearForm() {

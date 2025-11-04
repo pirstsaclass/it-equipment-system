@@ -1534,11 +1534,14 @@ function exportToExcel() {
     let csv = [];
     const headers = [];
     
-    // เพิ่มหัวข้อ
+    // เพิ่มหัวข้อภาษาไทย
     table.querySelectorAll('thead th').forEach(header => {
         headers.push(header.textContent.trim());
     });
-    csv.push(headers.join(','));
+    
+    // เพิ่ม BOM สำหรับรองรับภาษาไทยใน Excel
+    const BOM = "\uFEFF";
+    csv.push(BOM + headers.join(','));
     
     // เพิ่มข้อมูล
     rows.forEach(row => {
@@ -1549,14 +1552,22 @@ function exportToExcel() {
             // ลบ HTML tags และจัดการกับเครื่องหมาย comma
             text = text.replace(/,/g, ';');
             text = text.replace(/\n/g, ' ');
+            text = text.replace(/\r/g, ' ');
             
-            // ลบ badge text
+            // ลบ badge text และเอาเฉพาะข้อความสถานะ
             const badge = cell.querySelector('.badge');
             if (badge) {
                 text = badge.textContent.trim();
             }
             
-            rowData.push(text);
+            // จัดการกับข้อมูลการจำหน่าย
+            const smallText = cell.querySelector('small');
+            if (smallText) {
+                text += ' ' + smallText.textContent.trim();
+            }
+            
+            // ใส่ใน quotes เพื่อป้องกันปัญหา comma
+            rowData.push(`"${text}"`);
         });
         csv.push(rowData.join(','));
     });
@@ -1567,8 +1578,11 @@ function exportToExcel() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     
+    // ใช้ชื่อไฟล์ภาษาไทย
+    const today = new Date();
+    const dateString = today.toLocaleDateString('th-TH').replace(/\//g, '-');
     link.setAttribute('href', url);
-    link.setAttribute('download', `ครุภัณฑ์_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `รายงานครุภัณฑ์_${dateString}.csv`);
     link.style.visibility = 'hidden';
     
     document.body.appendChild(link);

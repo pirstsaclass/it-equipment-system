@@ -118,3 +118,5 @@ function calculateRemainingValue(purchasePrice, purchaseDate) {
     
     return remainingValue.toFixed(2);
 }
+
+

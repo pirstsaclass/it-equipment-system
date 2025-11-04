@@ -1,5 +1,5 @@
 <!-- Sidebar -->
-<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+<nav id="sidebar" class="col-md-3 col-lg-2 d-md-block sidebar collapse bg-dark">
     <div class="position-sticky d-flex flex-column h-100">
         <!-- ส่วนเนื้อหาเมนู -->
         <div class="flex-grow-1">
@@ -18,6 +18,7 @@
                 </li>
                 
                 <!-- จัดการข้อมูล -->
+                <?php if (hasPermission(['admin', 'user'])): ?>
                 <li class="nav-item mt-1">
                     <div class="sidebar-section-header">
                         <span class="text-white fw-bold">จัดการข้อมูล</span>
@@ -52,9 +53,11 @@
                         <i class="fas fa-chalkboard-teacher"></i>
                         <span>อุปกรณ์ในห้องเรียน</span>
                     </a>
-                </li>                
+                </li>
+                <?php endif; ?>
                 
                 <!-- ข้อมูลองค์กร -->
+                <?php if (hasPermission(['admin', 'user'])): ?>
                 <li class="nav-item mt-2">
                     <div class="sidebar-section-header">
                         <span class="text-white fw-bold">ข้อมูลองค์กร</span>
@@ -65,7 +68,7 @@
                         <i class="fas fa-fw fa-building"></i>
                         โรงเรียน/แผนก
                     </a>
-                </li>                
+                </li>
                 <li class="nav-item">
                     <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'buildingfloorplans.php' ? 'active' : ''; ?>" href="buildingfloorplans.php">
                         <i class="fas fa-fw fa-building"></i>
@@ -78,8 +81,10 @@
                         พนักงาน
                     </a>
                 </li>
+                <?php endif; ?>
                 
                 <!-- รายงานและการตั้งค่า -->
+                <?php if (hasPermission(['admin'])): ?>
                 <li class="nav-item mt-2">
                     <div class="sidebar-section-header">
                         <span class="text-white fw-bold">รายงานและการตั้งค่า</span>
@@ -97,6 +102,7 @@
                         จัดการข้อมูลผู้ใช้
                     </a>
                 </li>
+                <?php endif; ?>
             </ul>
         </div>
 
