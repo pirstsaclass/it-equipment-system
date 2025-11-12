@@ -92,10 +92,16 @@ $users_query = "SELECT u.* FROM users u ORDER BY u.id";
 $users_list = $db->query($users_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<?php include 'includes/sidebar.php'; ?>
-
-<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-    <?php include 'includes/navbar.php'; ?>
+    <!-- Navbar -->
+<?php include 'includes/navbar.php'; ?>
+<?php 
+// Include sidebar
+include 'includes/sidebar.php';
+?>
+<div id="layoutSidenav_content">
+<!-- Main Content -->
+    <main >
+    <div class="container-fluid px-4">
 
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">จัดการข้อมูลผู้ใช้</h1>

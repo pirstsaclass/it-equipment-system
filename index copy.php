@@ -48,27 +48,19 @@ $frequent_repair_query = "
 $frequent_repairs = $db->query($frequent_repair_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-
-    <!-- Navbar -->
-<?php include 'includes/navbar.php'; ?>
 <?php 
 // Include sidebar
 include 'includes/sidebar.php';
 ?>
-<div id="layoutSidenav_content">
+
 <!-- Main Content -->
-    <main >
-    <div class="container-fluid px-4">
-        
+<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+    <!-- Navbar -->
+    <?php include 'includes/navbar.php'; ?>
 
     <!-- Page Heading -->
-      <h1 class="mt-4">Dashboard</h1>                     
-
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        
-        <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item active">Dashboard</li>
-                        </ol>
+        <h1 class="h3 mb-0 text-gray-800">ภาพรวมระบบ</h1>
         <a href="reports.php" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
             <i class="fas fa-download fa-sm text-white-50"></i> สร้างรายงาน
         </a>
@@ -245,7 +237,7 @@ include 'includes/sidebar.php';
             </div>
         </div>
     </div>
-</div>
+</main>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

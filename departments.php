@@ -64,13 +64,17 @@ $departments_query = "SELECT * FROM departments ORDER BY id ASC";
 $departments_list = $db->query($departments_query)->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
+    <!-- Navbar -->
+<?php include 'includes/navbar.php'; ?>
 <?php 
 // Include sidebar
 include 'includes/sidebar.php';
 ?>
+<div id="layoutSidenav_content">
+<!-- Main Content -->
+    <main >
+    <div class="container-fluid px-4">
 
-<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-    <?php include 'includes/navbar.php'; ?>
 
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">จัดการแผนก</h1>

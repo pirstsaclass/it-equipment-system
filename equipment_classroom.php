@@ -172,13 +172,16 @@ $equipment_query = $db->query("SELECT equipment_code, equipment_name, brand_name
 $equipment_options = $equipment_query->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
+    <!-- Navbar -->
+<?php include 'includes/navbar.php'; ?>
 <?php 
 // Include sidebar
 include 'includes/sidebar.php';
 ?>
-
-<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-    <?php include 'includes/navbar.php'; ?>
+<div id="layoutSidenav_content">
+<!-- Main Content -->
+<main >
+    <div class="container-fluid px-4">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">
