@@ -10987,7 +10987,7 @@ body {
 }
 .sb-sidenav .sb-sidenav-menu .nav .sb-sidenav-menu-heading {
   padding: 1.75rem 1rem 0.75rem;
-  font-size: 1.75rem;
+  font-size: 0.75rem;
   font-weight: bold;
   text-transform: uppercase;
 }
@@ -11018,32 +11018,32 @@ body {
   flex-shrink: 0;
 }
 
-.sb-sidenav-blue {
-  background-color: #0d6efd;
+.sb-sidenav-dark {
+  background-color: #212529;
   color: rgba(255, 255, 255, 0.5);
 }
-.sb-sidenav-blue .sb-sidenav-menu .sb-sidenav-menu-heading {
+.sb-sidenav-dark .sb-sidenav-menu .sb-sidenav-menu-heading {
   color: rgba(255, 255, 255, 0.25);
 }
-.sb-sidenav-blue .sb-sidenav-menu .nav-link {
+.sb-sidenav-dark .sb-sidenav-menu .nav-link {
   color: rgba(255, 255, 255, 0.5);
 }
-.sb-sidenav-blue .sb-sidenav-menu .nav-link .sb-nav-link-icon {
+.sb-sidenav-dark .sb-sidenav-menu .nav-link .sb-nav-link-icon {
   color: rgba(255, 255, 255, 0.25);
 }
-.sb-sidenav-blue .sb-sidenav-menu .nav-link .sb-sidenav-collapse-arrow {
+.sb-sidenav-dark .sb-sidenav-menu .nav-link .sb-sidenav-collapse-arrow {
   color: rgba(255, 255, 255, 0.25);
 }
-.sb-sidenav-blue .sb-sidenav-menu .nav-link:hover {
+.sb-sidenav-dark .sb-sidenav-menu .nav-link:hover {
   color: #fff;
 }
-.sb-sidenav-blue .sb-sidenav-menu .nav-link.active {
+.sb-sidenav-dark .sb-sidenav-menu .nav-link.active {
   color: #fff;
 }
-.sb-sidenav-blue .sb-sidenav-menu .nav-link.active .sb-nav-link-icon {
+.sb-sidenav-dark .sb-sidenav-menu .nav-link.active .sb-nav-link-icon {
   color: #fff;
 }
-.sb-sidenav-blue .sb-sidenav-footer {
+.sb-sidenav-dark .sb-sidenav-footer {
   background-color: #343a40;
 }
 
@@ -22542,3 +22542,15 @@ body {
     color: white !important;
 }
 
+/* Fix Thai font display */
+.menu-text {
+    font-family: 'Segoe UI', 'Sarabun', 'Thonburi', 'Fira Sans', sans-serif !important;
+    font-weight: 500;
+}
+
+.sb-sidenav-blue .menu-text {
+    font-family: 'Segoe UI', 'Sarabun', 'Thonburi', 'Fira Sans', sans-serif !important;
+}
+
+/* Ensure proper font loading */
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap');

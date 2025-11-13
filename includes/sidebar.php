@@ -1,9 +1,9 @@
 <div id="layoutSidenav">
             <div id="layoutSidenav_nav">
-                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                <nav class="sb-sidenav sb-sidenav-dark" id="sidenavAccordion">
                     <div class="sb-sidenav-menu">
                         <div class="nav">
-                            <div class="sb-sidenav-menu-heading">Core</div>                           
+                            <div class="sb-sidenav-menu-heading">Home</div>                           
                             <li class="nav-item">
                                 <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php">
                                     <i class="fas fa-fw fa-tachometer-alt"></i>
@@ -13,16 +13,7 @@
                             
                             <!-- จัดการข้อมูล -->
                             <?php if (hasPermission(['admin', 'user'])): ?>
-                            <div class="sb-sidenav-menu-heading">จัดการข้อมูล</div>
-                            
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapseLayouts" aria-expanded="false" aria-controls="collapseLayouts">
-                                <div class="sb-nav-link-icon"><i class="fas fa-fw fa-laptop"></i></div>
-                                ครุภัณฑ์
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                            </a>
-
-                            <div class="collapse" id="collapseLayouts" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
+                            <div class="sb-sidenav-menu-heading">จัดการข้อมูลครุภัณฑ์</div>                                 
                                     <li class="nav-item">
                                         <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'equipment.php' ? 'active' : ''; ?>" href="equipment.php">
                                             <i class="fas fa-fw fa-laptop"></i>
@@ -35,38 +26,31 @@
                                             หมวดหมู่และประเภทครุภัณฑ์
                                         </a>
                                     </li>
-                                </nav>
-                            </div>
-
-                            <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#collapsePages" aria-expanded="false" aria-controls="collapsePages">
-                                <div class="sb-nav-link-icon"><i class="fas fa-book-open"></i></div>
-                                ระบบซ่อมบำรุง
-                                <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                            </a>
-                            <div class="collapse" id="collapsePages" aria-labelledby="headingTwo" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav accordion" id="sidenavAccordionPages">
-                                    <li class="nav-item">
-                                        <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'maintenance.php' ? 'active' : ''; ?>" href="maintenance.php">
-                                            <i class="fas fa-fw fa-tools"></i>
-                                            ระบบซ่อมบำรุง
-                                        </a>
-                                    </li>
-                                    
                                     <li class="nav-item">
                                         <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'disposal.php' ? 'active' : ''; ?>" href="disposal.php">
                                             <i class="fas fa-trash-alt me-2"></i> 
-                                            ระบบจำหน่ายครุภัณฑ์
+                                            จำหน่ายครุภัณฑ์
                                         </a>
                                     </li>
+                            <?php endif; ?>
+                            
+                            <!-- ระบบซ่อมบำรุง -->
+                             <!-- จัดการข้อมูล -->
+                            <?php if (hasPermission(['admin', 'user','technician'])): ?>
+                            <div class="sb-sidenav-menu-heading">ระบบซ่อมบำรุง</div>                          
+                                    <li class="nav-item">
+                                        <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'maintenance.php' ? 'active' : ''; ?>" href="maintenance.php">
+                                            <i class="fas fa-fw fa-tools"></i>
+                                            ระบบแจ้งซ่อม
+                                        </a>
+                                    </li>                                   
+                                    
                                     <li class="nav-item">
                                         <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'equipment_classroom.php' ? 'active' : ''; ?>" href="equipment_classroom.php">
                                             <i class="fas fa-chalkboard-teacher"></i>
                                             อุปกรณ์ในห้องเรียน
                                         </a>
-                                    </li>
-                                    
-                                </nav>
-                            </div>
+                                    </li>                                  
                             <?php endif; ?>
 
                              <!-- ข้อมูลองค์กร -->
