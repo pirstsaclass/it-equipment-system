@@ -2,9 +2,11 @@
             <div id="layoutSidenav_nav">
                 <nav class="sb-sidenav sb-sidenav-dark" id="sidenavAccordion">
                     <div class="sb-sidenav-menu">
-                        <div class="nav">                            
+                        <div class="nav">
+                            
+                            
                              <!-- Divider -->
-                       
+                        <hr class="sidebar-divider my-2">
 
                         <!-- Nav Item - Dashboard -->
                         <li class="nav-item">
@@ -23,14 +25,14 @@
                             <ul class="nav flex-column">
                                     <li class="nav-item">
                                         <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'equipment.php' ? 'active' : ''; ?>" href="equipment.php">
-                                            <i class="fas fa-fw fa-laptop"></i>
-                                            ครุภัณฑ์
+                                            <i class="fas fa-fw fa-laptop"></i> 
+                                             ครุภัณฑ์
                                         </a>
                                     </li>
                                     <li class="nav-item">
                                         <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>" href="categories.php">
-                                            <i class="fas fa-fw fa-tags"></i>
-                                            หมวดหมู่และประเภทครุภัณฑ์
+                                            <i class="fas fa-fw fa-tags"></i> 
+                                             หมวดหมู่/ประเภท
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -90,7 +92,7 @@
                     <!-- รายงานและการตั้งค่า -->
                     <?php if (hasPermission(['admin'])): ?>
                     <div class="sb-sidenav-menu-heading">รายงานและการตั้งค่า</div> 
-                    <ul class="nav flex-column">                   
+                    <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php">
                                 <i class="fas fa-fw fa-chart-bar"></i>
