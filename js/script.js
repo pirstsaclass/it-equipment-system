@@ -1,6 +1,8 @@
 // Custom JavaScript for IT Equipment Management System
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Script loaded'); // สำหรับ debug
+    
     // Enable Bootstrap tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -8,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Initialize DataTables
-    if ($.fn.DataTable) {
+    if (window.jQuery && $.fn.DataTable) {
         $('.data-table').DataTable({
             language: {
                 url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
@@ -31,9 +33,104 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Auto-hide alerts after 5 seconds
     setTimeout(function() {
-        $('.alert').alert('close');
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.classList.contains('alert-dismissible')) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }
+        });
     }, 5000);
+    
+    // Initialize Sidebar Toggle
+    initializeSidebarToggle();
+    
+    // Initialize dropdown active states
+    initializeDropdowns();
 });
+
+// Sidebar Toggle Function
+function initializeSidebarToggle() {
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    
+    if (sidebarToggle) {
+        console.log('Sidebar toggle found'); // สำหรับ debug
+        
+        sidebarToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Sidebar toggle clicked'); // สำหรับ debug
+            
+            const body = document.body;
+            body.classList.toggle('sb-sidenav-toggled');
+            
+            // Save state to localStorage
+            localStorage.setItem('sb|sidebar-toggle', body.classList.contains('sb-sidenav-toggled'));
+        });
+        
+        // Restore sidebar state from localStorage
+        const sidebarToggled = localStorage.getItem('sb|sidebar-toggle') === 'true';
+        if (sidebarToggled) {
+            document.body.classList.add('sb-sidenav-toggled');
+        }
+    } else {
+        console.error('Sidebar toggle button not found');
+    }
+}
+
+// Initialize dropdown active states
+function initializeDropdowns() {
+    const currentPage = window.location.pathname.split('/').pop();
+    console.log('Current page:', currentPage); // สำหรับ debug
+    
+    const dropdowns = {
+        'equipmentCollapse': ['equipment.php', 'categories.php', 'disposal.php'],
+        'maintenanceCollapse': ['maintenance.php', 'equipment_classroom.php'],
+        'organizationCollapse': ['departments.php', 'buildingfloorplans.php', 'employees.php']
+    };
+    
+    for (const [dropdownId, pages] of Object.entries(dropdowns)) {
+        if (pages.includes(currentPage)) {
+            const dropdownElement = document.getElementById(dropdownId);
+            const dropdownToggle = document.querySelector(`[data-bs-target="#${dropdownId}"]`);
+            
+            if (dropdownElement && dropdownToggle) {
+                // เปิด dropdown
+                const bsCollapse = new bootstrap.Collapse(dropdownElement, {
+                    toggle: false
+                });
+                bsCollapse.show();
+                
+                dropdownToggle.classList.remove('collapsed');
+                dropdownToggle.setAttribute('aria-expanded', 'true');
+                
+                // เปลี่ยนไอคอนลูกศร
+                const arrowIcon = dropdownToggle.querySelector('.fa-angle-down');
+                if (arrowIcon) {
+                    arrowIcon.classList.remove('fa-angle-down');
+                    arrowIcon.classList.add('fa-angle-up');
+                }
+            }
+        }
+    }
+    
+    // จัดการการคลิก dropdown
+    const dropdownToggles = document.querySelectorAll('.nav-link[data-bs-toggle="collapse"]');
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            const arrowIcon = this.querySelector('.fa-angle-down, .fa-angle-up');
+            if (arrowIcon) {
+                const isExpanded = this.getAttribute('aria-expanded') === 'true';
+                if (isExpanded) {
+                    arrowIcon.classList.remove('fa-angle-up');
+                    arrowIcon.classList.add('fa-angle-down');
+                } else {
+                    arrowIcon.classList.remove('fa-angle-down');
+                    arrowIcon.classList.add('fa-angle-up');
+                }
+            }
+        });
+    });
+}
 
 // Function to show confirmation before delete
 function confirmDelete(itemName) {
@@ -118,22 +215,4 @@ function calculateRemainingValue(purchasePrice, purchaseDate) {
     
     return remainingValue.toFixed(2);
 }
-
-window.addEventListener('DOMContentLoaded', event => {
-
-    // Toggle the side navigation
-    const sidebarToggle = document.body.querySelector('#sidebarToggle');
-    if (sidebarToggle) {
-        // Uncomment Below to persist sidebar toggle between refreshes
-        // if (localStorage.getItem('sb|sidebar-toggle') === 'true') {
-        //     document.body.classList.toggle('sb-sidenav-toggled');
-        // }
-        sidebarToggle.addEventListener('click', event => {
-            event.preventDefault();
-            document.body.classList.toggle('sb-sidenav-toggled');
-            localStorage.setItem('sb|sidebar-toggle', document.body.classList.contains('sb-sidenav-toggled'));
-        });
-    }
-
-});
 

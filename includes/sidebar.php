@@ -1,75 +1,61 @@
-[file name]: sidebar.php
-[file content begin]
 <div id="layoutSidenav">
     <div id="layoutSidenav_nav">
-        <nav class="sb-sidenav sb-sidenav-dark" id="sidenavAccordion">
+        <nav class="sb-sidenav sb-sidenav-blue" id="sidenavAccordion" style="background-color: #1e88e5;">
             <div class="sb-sidenav-menu">
                 <div class="nav">
                     <!-- Divider -->
+                     
+                    <div class="sb-sidenav-menu-heading">เมนูหลัก</div>
                     <!-- Nav Item - Dashboard -->
                     <li class="nav-item">
-                        <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php">
-                            <i class="fas fa-fw fa-tachometer-alt"></i>
+                        <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>" href="index.php">
+                            <i class="fas fa-fw fa-tachometer-alt me-2"></i>
                             <span>Dashboard</span>
                         </a>
                     </li>
-                    <!-- Divider -->
-                    <hr class="sidebar-divider my-2">
+                 
 
                     <!-- จัดการข้อมูลครุภัณฑ์ -->
                     <?php if (hasPermission(['admin', 'user'])): ?>
                     <div class="sb-sidenav-menu-heading">จัดการข้อมูลครุภัณฑ์</div>
                     <ul class="nav flex-column">
-                        <!-- Dropdown สำหรับจัดการครุภัณฑ์ -->
                         <li class="nav-item">
-                            <a class="nav-link collapsed sidebar-submenu" href="#" data-bs-toggle="collapse" data-bs-target="#equipmentCollapse" aria-expanded="false" aria-controls="equipmentCollapse">
-                                <i class="fas fa-fw fa-laptop"></i>
-                                <span>จัดการครุภัณฑ์</span>
-                                <i class="fas fa-angle-down ms-auto"></i>
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'equipment.php' ? 'active' : ''; ?>" href="equipment.php">
+                                <i class="fas fa-fw fa-list me-2"></i>
+                                <span>รายการครุภัณฑ์</span>
                             </a>
-                            <div class="collapse" id="equipmentCollapse" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'equipment.php' ? 'active' : ''; ?>" href="equipment.php">
-                                        <i class="fas fa-fw fa-list"></i>
-                                        รายการครุภัณฑ์
-                                    </a>
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>" href="categories.php">
-                                        <i class="fas fa-fw fa-tags"></i>
-                                        หมวดหมู่และประเภท
-                                    </a>
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'disposal.php' ? 'active' : ''; ?>" href="disposal.php">
-                                        <i class="fas fa-trash-alt me-2"></i>
-                                        จำหน่ายครุภัณฑ์
-                                    </a>
-                                </nav>
-                            </div>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>" href="categories.php">
+                                <i class="fas fa-fw fa-tags me-2"></i>
+                                <span>หมวดหมู่และประเภท</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'disposal.php' ? 'active' : ''; ?>" href="disposal.php">
+                                <i class="fas fa-trash-alt me-2"></i>
+                                <span>จำหน่ายครุภัณฑ์</span>
+                            </a>
+                        </li>
+                        
                     </ul>
+                    
                     <?php endif; ?>
-
                     <!-- ระบบซ่อมบำรุง -->
                     <?php if (hasPermission(['admin', 'user','technician'])): ?>
                     <div class="sb-sidenav-menu-heading">ระบบซ่อมบำรุง</div>
                     <ul class="nav flex-column">
-                        <!-- Dropdown สำหรับระบบซ่อมบำรุง -->
                         <li class="nav-item">
-                            <a class="nav-link collapsed sidebar-submenu" href="#" data-bs-toggle="collapse" data-bs-target="#maintenanceCollapse" aria-expanded="false" aria-controls="maintenanceCollapse">
-                                <i class="fas fa-fw fa-tools"></i>
-                                <span>ระบบซ่อมบำรุง</span>
-                                <i class="fas fa-angle-down ms-auto"></i>
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'maintenance.php' ? 'active' : ''; ?>" href="maintenance.php">
+                                <i class="fas fa-fw fa-wrench me-2"></i>
+                                <span>ระบบแจ้งซ่อม</span>
                             </a>
-                            <div class="collapse" id="maintenanceCollapse" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'maintenance.php' ? 'active' : ''; ?>" href="maintenance.php">
-                                        <i class="fas fa-fw fa-wrench"></i>
-                                        ระบบแจ้งซ่อม
-                                    </a>
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'equipment_classroom.php' ? 'active' : ''; ?>" href="equipment_classroom.php">
-                                        <i class="fas fa-chalkboard-teacher"></i>
-                                        อุปกรณ์ในห้องเรียน
-                                    </a>
-                                </nav>
-                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'equipment_classroom.php' ? 'active' : ''; ?>" href="equipment_classroom.php">
+                                <i class="fas fa-chalkboard-teacher me-2"></i>
+                                <span>อุปกรณ์ในห้องเรียน</span>
+                            </a>
                         </li>
                     </ul>
                     <?php endif; ?>
@@ -78,29 +64,23 @@
                     <?php if (hasPermission(['admin', 'user'])): ?>
                     <div class="sb-sidenav-menu-heading">ข้อมูลองค์กร</div>
                     <ul class="nav flex-column">
-                        <!-- Dropdown สำหรับข้อมูลองค์กร -->
                         <li class="nav-item">
-                            <a class="nav-link collapsed sidebar-submenu" href="#" data-bs-toggle="collapse" data-bs-target="#organizationCollapse" aria-expanded="false" aria-controls="organizationCollapse">
-                                <i class="fas fa-fw fa-building"></i>
-                                <span>ข้อมูลองค์กร</span>
-                                <i class="fas fa-angle-down ms-auto"></i>
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'departments.php' ? 'active' : ''; ?>" href="departments.php">
+                                <i class="fas fa-fw fa-university me-2"></i>
+                                <span>โรงเรียน/แผนก</span>
                             </a>
-                            <div class="collapse" id="organizationCollapse" data-bs-parent="#sidenavAccordion">
-                                <nav class="sb-sidenav-menu-nested nav">
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'departments.php' ? 'active' : ''; ?>" href="departments.php">
-                                        <i class="fas fa-fw fa-university"></i>
-                                        โรงเรียน/แผนก
-                                    </a>
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'buildingfloorplans.php' ? 'active' : ''; ?>" href="buildingfloorplans.php">
-                                        <i class="fas fa-fw fa-map"></i>
-                                        แผนผังตารางห้อง
-                                    </a>
-                                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'employees.php' ? 'active' : ''; ?>" href="employees.php">
-                                        <i class="fas fa-fw fa-users"></i>
-                                        พนักงาน
-                                    </a>
-                                </nav>
-                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'buildingfloorplans.php' ? 'active' : ''; ?>" href="buildingfloorplans.php">
+                                <i class="fas fa-fw fa-map me-2"></i>
+                                <span>แผนผังตารางห้อง</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'employees.php' ? 'active' : ''; ?>" href="employees.php">
+                                <i class="fas fa-fw fa-users me-2"></i>
+                                <span>พนักงาน</span>
+                            </a>
                         </li>
                     </ul>
                     <?php endif; ?>
@@ -110,97 +90,161 @@
                     <div class="sb-sidenav-menu-heading">รายงานและการตั้งค่า</div>
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php">
-                                <i class="fas fa-fw fa-chart-bar"></i>
-                                รายงาน
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>" href="reports.php">
+                                <i class="fas fa-fw fa-chart-bar me-2"></i>
+                                <span>รายงาน</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>" href="users.php">
-                                <i class="fas fa-fw fa-user-cog"></i>
-                                จัดการข้อมูลผู้ใช้
+                            <a class="nav-link py-1 <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>" href="users.php">
+                                <i class="fas fa-fw fa-user-cog me-2"></i>
+                                <span>จัดการข้อมูลผู้ใช้</span>
                             </a>
                         </li>
                     </ul>
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="sb-sidenav-footer">
+            <div class="sb-sidenav-footer" style="background-color: #1976d2;">
                 <div class="small">Logged in as: <?php echo $_SESSION['username']; ?></div>
-                <div class="user-role"><?php echo ucfirst($_SESSION['role']); ?></div>
-                <!--<a href="logout.php" class="logout-btn ms-auto" title="ออกจากระบบ">Logout
-                 <i class="fas fa-sign-out-alt"></i>
-               </a>-->
+                <div class="user-role small"><?php echo ucfirst($_SESSION['role']); ?></div>
             </div>
         </nav>
     </div>
 
-    <!-- JavaScript สำหรับจัดการสถานะ active ของ dropdown -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // ฟังก์ชันสำหรับตั้งค่า dropdown ให้เปิดอัตโนมัติเมื่ออยู่ในหน้าที่เกี่ยวข้อง
-        function setActiveDropdown() {
-            const currentPage = '<?php echo basename($_SERVER['PHP_SELF']); ?>';
-            
-            // ตรวจสอบแต่ละ dropdown ว่ามีลิงก์ที่ active อยู่หรือไม่
-            const dropdowns = {
-                'equipmentCollapse': ['equipment.php', 'categories.php', 'disposal.php'],
-                'maintenanceCollapse': ['maintenance.php', 'equipment_classroom.php'],
-                'organizationCollapse': ['departments.php', 'buildingfloorplans.php', 'employees.php']
-            };
-            
-            // ตรวจสอบแต่ละ dropdown
-            for (const [dropdownId, pages] of Object.entries(dropdowns)) {
-                if (pages.includes(currentPage)) {
-                    const dropdownElement = document.getElementById(dropdownId);
-                    const dropdownToggle = document.querySelector(`[data-bs-target="#${dropdownId}"]`);
-                    
-                    if (dropdownElement && dropdownToggle) {
-                        // เปิด dropdown
-                        dropdownElement.classList.add('show');
-                        dropdownToggle.classList.remove('collapsed');
-                        dropdownToggle.setAttribute('aria-expanded', 'true');
-                    }
-                }
-            }
-        }
-        
-        // เรียกใช้ฟังก์ชันเมื่อโหลดหน้า
-        setActiveDropdown();
-        
-        // เพิ่ม event listener สำหรับการคลิก dropdown
-        const dropdownToggles = document.querySelectorAll('.nav-link[data-bs-toggle="collapse"]');
-        dropdownToggles.forEach(toggle => {
-            toggle.addEventListener('click', function() {
-                const targetId = this.getAttribute('data-bs-target').replace('#', '');
-                const targetElement = document.getElementById(targetId);
-                
-                if (targetElement) {
-                    const isExpanded = this.getAttribute('aria-expanded') === 'true';
-                    
-                    // เปลี่ยนไอคอนลูกศร
-                    const arrowIcon = this.querySelector('.fa-angle-down, .fa-angle-up');
-                    if (arrowIcon) {
-                        if (isExpanded) {
-                            arrowIcon.classList.remove('fa-angle-up');
-                            arrowIcon.classList.add('fa-angle-down');
-                        } else {
-                            arrowIcon.classList.remove('fa-angle-down');
-                            arrowIcon.classList.add('fa-angle-up');
-                        }
-                    }
-                }
-            });
-        });
-        
-        // ตั้งค่าไอคอนลูกศรเริ่มต้นสำหรับ dropdown ที่เปิดอยู่
-        const activeDropdownToggles = document.querySelectorAll('.nav-link[data-bs-toggle="collapse"][aria-expanded="true"]');
-        activeDropdownToggles.forEach(toggle => {
-            const arrowIcon = toggle.querySelector('.fa-angle-down');
-            if (arrowIcon) {
-                arrowIcon.classList.remove('fa-angle-down');
-                arrowIcon.classList.add('fa-angle-up');
-            }
-        });
-    });
-    </script>
+
+<style>
+/* ปรับแต่ง Sidebar ให้เป็นสีฟ้า */
+.sb-sidenav-blue {
+    background-color: #1e88e5 !important;
+}
+
+/* เพิ่มเงาขอบให้กับ sidebar */
+#sidenavAccordion {
+    background-color: #1e88e5 !important;
+    box-shadow: 
+        3px 0 15px rgba(0, 0, 0, 0.15),
+        1px 0 5px rgba(0, 0, 0, 0.1),
+        inset -1px 0 2px rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sb-sidenav-menu-heading {
+    padding: 0.75rem 1rem 0.5rem;
+    font-size: 0.85rem !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0;
+    color: #e3f2fd;
+    border-bottom: 1px solid #42a5f5;
+}
+
+.sb-sidenav .nav-link {
+    padding: 0.5rem 1rem 0.5rem 1.5rem !important;
+    font-size: 0.875rem;
+    font-weight: 400;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+    color: #e3f2fd;
+}
+
+.sb-sidenav .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-left-color: #bbdefb;
+    color: #ffffff;
+    box-shadow: inset 2px 0 5px rgba(255, 255, 255, 0.05);
+}
+
+.sb-sidenav .nav-link.active {
+    background-color: rgba(187, 222, 251, 0.2);
+    border-left-color: #bbdefb;
+    font-weight: 500;
+    color: #ffffff;
+    box-shadow: 
+        inset 2px 0 8px rgba(255, 255, 255, 0.1),
+        0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sb-sidenav .nav-link i {
+    font-size: 0.8rem;
+    width: 1.2rem;
+    opacity: 0.9;
+    color: #e3f2fd;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.sb-sidenav .nav-link.active i {
+    opacity: 1;
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.sb-sidenav .nav-link:hover i {
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.sb-sidenav .nav-item {
+    margin-bottom: 0.05rem;
+}
+
+.sb-sidenav-footer {
+    padding: 1rem;
+    border-top: 1px solid #42a5f5;
+    background-color: #1976d2;
+    box-shadow: 
+        inset 0 1px 3px rgba(255, 255, 255, 0.1),
+        0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.sb-sidenav-footer .small {
+    font-size: 0.75rem;
+    font-weight: 300;
+    margin-bottom: 0.1rem;
+    color: #e3f2fd;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+.user-role {
+    font-weight: 400;
+    color: #bbdefb;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* ขยับเมนูทั้งหมดเข้ามา */
+.sb-sidenav-menu {
+    padding: 0.5rem 0;
+}
+
+.nav.flex-column {
+    margin-left: 0.5rem;
+}
+
+/* เพิ่มระยะห่างระหว่าง section */
+.sb-sidenav-menu-heading:not(:first-child) {
+    margin-top: 0.5rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ปรับสีเมื่อ hover บน footer */
+.sb-sidenav-footer:hover {
+    background-color: #1565c0 !important;
+    box-shadow: 
+        inset 0 1px 3px rgba(255, 255, 255, 0.15),
+        0 -2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* เพิ่มเอฟเฟกต์เงาให้กับเมนูหัวข้อ */
+.sb-sidenav-menu-heading {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* เพิ่มเงาให้กับเมนูย่อยเมื่อ hover */
+.nav.flex-column .nav-link:hover {
+    box-shadow: 
+        inset 2px 0 8px rgba(255, 255, 255, 0.08),
+        0 2px 4px rgba(0, 0, 0, 0.05);
+}
+</style>

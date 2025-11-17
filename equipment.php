@@ -519,72 +519,66 @@ include 'includes/sidebar.php';
         </div>
     <?php endif; ?>
 
-<!-- การ์ดแสดงสถิติครุภัณฑ์ -->
+
+<!-- ครุภัณฑ์ -->
 <div class="row mb-4">
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card bg-primary text-white shadow h-100">
-            <div class="card-body py-2">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
-                            ครุภัณฑ์ทั้งหมด</div>
-                        <div class="h6 mb-0 font-weight-bold"><?php echo number_format($total_equipment); ?></div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title"><?php echo number_format($total_equipment); ?></h4>
+                        <p class="card-text">ครุภัณฑ์ทั้งหมด</p>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-boxes fa-lg text-white-50"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card bg-success text-white shadow h-100">
-            <div class="card-body py-2">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
-                            ใช้งานปกติ</div>
-                        <div class="h6 mb-0 font-weight-bold"><?php echo number_format($status_counts['ใช้งานปกติ'] ?? 0); ?></div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-check-circle fa-lg text-white-50"></i>
+                    <div class="align-self-center">
+                        <i class="fas fa-box fa-2x"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card bg-warning text-white shadow h-100">
-            <div class="card-body py-2">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
-                            กำลังซ่อม/ชำรุด</div>
-                        <div class="h6 mb-0 font-weight-bold">
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title"><?php echo number_format($status_counts['ใช้งานปกติ'] ?? 0); ?></h4>
+                        <p class="card-text">ใช้งานปกติ</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">
                             <?php echo number_format(($status_counts['กำลังซ่อม'] ?? 0) + ($status_counts['ชำรุด'] ?? 0)); ?>
-                        </div>
+                        </h4>
+                        <p class="card-text">กำลังซ่อม/ชำรุด</p>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-tools fa-lg text-white-50"></i>
+                    <div class="align-self-center">
+                        <i class="fas fa-tools fa-2x"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card bg-danger text-white shadow h-100">
-            <div class="card-body py-2">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-white text-uppercase mb-1">
-                            จำหน่ายแล้ว</div>
-                        <div class="h6 mb-0 font-weight-bold"><?php echo number_format($status_counts['จำหน่ายแล้ว'] ?? 0); ?></div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title"><?php echo number_format($status_counts['จำหน่ายแล้ว'] ?? 0); ?></h4>
+                        <p class="card-text">จำหน่ายแล้ว</p>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-archive fa-lg text-white-50"></i>
+                    <div class="align-self-center">
+                        <i class="fas fa-archive fa-2x"></i>
                     </div>
                 </div>
             </div>
@@ -894,7 +888,7 @@ include 'includes/sidebar.php';
 
 <!-- Modal สำหรับเพิ่ม/แก้ไขครุภัณฑ์ -->
 <div class="modal fade" id="equipmentModal" tabindex="-1" aria-labelledby="equipmentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="POST" enctype="multipart/form-data" id="equipmentForm">
                 <div class="modal-header">

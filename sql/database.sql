@@ -215,6 +215,24 @@ CREATE TABLE IF NOT EXISTS equipment_classroom (
     INDEX idx_location (school_name, building_name, floor_level) COMMENT 'ดัชนีสำหรับค้นหาตามสถานที่ตั้ง'
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ตาราง calendar_events (ปฏิทินกิจกรรม)
+
+CREATE TABLE calendar_events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_title VARCHAR(255) NOT NULL,
+    event_description TEXT,
+    event_date DATE NOT NULL,
+    start_time TIME,
+    end_time TIME,
+    event_type ENUM('meeting', 'maintenance', 'inspection', 'training', 'other') DEFAULT 'other',
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+
+
+
 -- ข้อมูลตัวอย่าง
 
 
