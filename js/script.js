@@ -1,218 +1,229 @@
-// Custom JavaScript for IT Equipment Management System
-
+// SB Admin Sidebar Toggle Functionality
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Script loaded'); // สำหรับ debug
-    
-    // Enable Bootstrap tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-    
-    // Initialize DataTables
-    if (window.jQuery && $.fn.DataTable) {
-        $('.data-table').DataTable({
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
-            },
-            responsive: true
-        });
-    }
-    
-    // Form validation
-    const forms = document.querySelectorAll('.needs-validation');
-    Array.from(forms).forEach(form => {
-        form.addEventListener('submit', event => {
-            if (!form.checkValidity()) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            form.classList.add('was-validated');
-        }, false);
-    });
-    
-    // Auto-hide alerts after 5 seconds
-    setTimeout(function() {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(alert => {
-            if (alert.classList.contains('alert-dismissible')) {
-                const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            }
-        });
-    }, 5000);
-    
-    // Initialize Sidebar Toggle
-    initializeSidebarToggle();
-    
-    // Initialize dropdown active states
-    initializeDropdowns();
-});
-
-// Sidebar Toggle Function
-function initializeSidebarToggle() {
     const sidebarToggle = document.getElementById('sidebarToggle');
     
+    // Toggle sidebar
     if (sidebarToggle) {
-        console.log('Sidebar toggle found'); // สำหรับ debug
-        
         sidebarToggle.addEventListener('click', function(e) {
             e.preventDefault();
-            console.log('Sidebar toggle clicked'); // สำหรับ debug
-            
-            const body = document.body;
-            body.classList.toggle('sb-sidenav-toggled');
-            
-            // Save state to localStorage
-            localStorage.setItem('sb|sidebar-toggle', body.classList.contains('sb-sidenav-toggled'));
+            document.body.classList.toggle('sb-sidenav-toggled');
+            localStorage.setItem('sb-sidenav-toggled', document.body.classList.contains('sb-sidenav-toggled'));
         });
-        
-        // Restore sidebar state from localStorage
-        const sidebarToggled = localStorage.getItem('sb|sidebar-toggle') === 'true';
-        if (sidebarToggled) {
-            document.body.classList.add('sb-sidenav-toggled');
-        }
-    } else {
-        console.error('Sidebar toggle button not found');
     }
+    
+    // Restore sidebar state from localStorage
+    if (localStorage.getItem('sb-sidenav-toggled') === 'true') {
+        document.body.classList.add('sb-sidenav-toggled');
+    }
+    
+    // Handle responsive behavior
+    function handleResize() {
+        if (window.innerWidth < 768) {
+            document.body.classList.remove('sb-sidenav-toggled');
+        }
+    }
+    
+    window.addEventListener('resize', handleResize);
+    handleResize();
+});
+
+// Global functions
+function confirmAction(message = 'คุณแน่ใจหรือไม่?') {
+    return confirm(message);
 }
 
-// Initialize dropdown active states
-function initializeDropdowns() {
-    const currentPage = window.location.pathname.split('/').pop();
-    console.log('Current page:', currentPage); // สำหรับ debug
-    
-    const dropdowns = {
-        'equipmentCollapse': ['equipment.php', 'categories.php', 'disposal.php'],
-        'maintenanceCollapse': ['maintenance.php', 'equipment_classroom.php'],
-        'organizationCollapse': ['departments.php', 'buildingfloorplans.php', 'employees.php']
-    };
-    
-    for (const [dropdownId, pages] of Object.entries(dropdowns)) {
-        if (pages.includes(currentPage)) {
-            const dropdownElement = document.getElementById(dropdownId);
-            const dropdownToggle = document.querySelector(`[data-bs-target="#${dropdownId}"]`);
-            
-            if (dropdownElement && dropdownToggle) {
-                // เปิด dropdown
-                const bsCollapse = new bootstrap.Collapse(dropdownElement, {
-                    toggle: false
-                });
-                bsCollapse.show();
-                
-                dropdownToggle.classList.remove('collapsed');
-                dropdownToggle.setAttribute('aria-expanded', 'true');
-                
-                // เปลี่ยนไอคอนลูกศร
-                const arrowIcon = dropdownToggle.querySelector('.fa-angle-down');
-                if (arrowIcon) {
-                    arrowIcon.classList.remove('fa-angle-down');
-                    arrowIcon.classList.add('fa-angle-up');
-                }
-            }
-        }
+// Toast notifications
+function showToast(message, type = 'success') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
     }
     
-    // จัดการการคลิก dropdown
-    const dropdownToggles = document.querySelectorAll('.nav-link[data-bs-toggle="collapse"]');
-    dropdownToggles.forEach(toggle => {
-        toggle.addEventListener('click', function() {
-            const arrowIcon = this.querySelector('.fa-angle-down, .fa-angle-up');
-            if (arrowIcon) {
-                const isExpanded = this.getAttribute('aria-expanded') === 'true';
-                if (isExpanded) {
-                    arrowIcon.classList.remove('fa-angle-up');
-                    arrowIcon.classList.add('fa-angle-down');
-                } else {
-                    arrowIcon.classList.remove('fa-angle-down');
-                    arrowIcon.classList.add('fa-angle-up');
-                }
-            }
-        });
+    // Create toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    toastContainer.appendChild(toastEl);
+    
+    // Initialize and show toast
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+    
+    // Remove toast from DOM after it's hidden
+    toastEl.addEventListener('hidden.bs.toast', function() {
+        toastEl.remove();
     });
 }
 
-// Function to show confirmation before delete
-function confirmDelete(itemName) {
-    return confirm(`คุณแน่ใจว่าต้องการลบ ${itemName} นี้? การกระทำนี้ไม่สามารถย้อนกลับได้`);
+// DataTables initialization
+function initializeDataTables(tableId, options = {}) {
+    const defaultOptions = {
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json'
+        },
+        responsive: true,
+        autoWidth: false
+    };
+    
+    const mergedOptions = {...defaultOptions, ...options};
+    return $(tableId).DataTable(mergedOptions);
 }
 
-// Function to export table data to Excel
-function exportTableToExcel(tableId, filename = '') {
-    var downloadLink;
-    var dataType = 'application/vnd.ms-excel';
-    var tableSelect = document.getElementById(tableId);
-    var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+// Form validation helper
+function validateForm(formId, rules) {
+    const form = document.getElementById(formId);
+    if (!form) return true;
     
-    // Specify file name
-    filename = filename ? filename + '.xls' : 'excel_data.xls';
+    let isValid = true;
+    const inputs = form.querySelectorAll('input, select, textarea');
     
-    // Create download link element
-    downloadLink = document.createElement("a");
+    inputs.forEach(input => {
+        if (rules[input.name] && !rules[input.name].test(input.value)) {
+            input.classList.add('is-invalid');
+            isValid = false;
+        } else {
+            input.classList.remove('is-invalid');
+        }
+    });
     
-    document.body.appendChild(downloadLink);
+    return isValid;
+}
+
+// AJAX helper functions
+const AjaxHelper = {
+    get: function(url, callback) {
+        fetch(url)
+            .then(response => response.json())
+            .then(data => callback(null, data))
+            .catch(error => callback(error, null));
+    },
     
-    if (navigator.msSaveOrOpenBlob) {
-        var blob = new Blob(['\ufeff', tableHTML], {
-            type: dataType
-        });
-        navigator.msSaveOrOpenBlob(blob, filename);
-    } else {
-        // Create a link to the file
-        downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
-        
-        // Setting the file name
-        downloadLink.download = filename;
-        
-        //triggering the function
-        downloadLink.click();
+    post: function(url, data, callback) {
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => callback(null, data))
+        .catch(error => callback(error, null));
+    },
+    
+    put: function(url, data, callback) {
+        fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => callback(null, data))
+        .catch(error => callback(error, null));
+    },
+    
+    delete: function(url, callback) {
+        fetch(url, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => callback(null, data))
+        .catch(error => callback(error, null));
     }
+};
+
+// Chart initialization helper
+function initializeChart(canvasId, config) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    return new Chart(ctx, config);
 }
 
-// Function to export table data to PDF
-function exportTableToPDF(tableId, filename = '') {
-    // This would require a PDF library like jsPDF
-    // For now, we'll just alert the user
-    alert('ฟังก์ชันการส่งออก PDF กำลังอยู่ในระหว่างการพัฒนา');
-}
-
-// Search equipment for maintenance
-function searchEquipment() {
-    var input = document.getElementById('equipmentSearch');
-    var filter = input.value.toUpperCase();
-    var table = document.getElementById('equipmentTable');
-    var tr = table.getElementsByTagName('tr');
+// Sidebar Accordion Functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize sidebar accordion
+    initializeSidebarAccordion();
     
-    for (var i = 0; i < tr.length; i++) {
-        var td = tr[i].getElementsByTagName('td')[0];
-        if (td) {
-            var txtValue = td.textContent || td.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                tr[i].style.display = '';
-            } else {
-                tr[i].style.display = 'none';
+    // Handle sidebar collapse on mobile
+    handleMobileSidebar();
+});
+
+function initializeSidebarAccordion() {
+    const collapseElements = document.querySelectorAll('.sb-sidenav-menu .collapse');
+    
+    collapseElements.forEach(collapse => {
+        // Set initial state based on active child
+        const activeChild = collapse.querySelector('.nav-link.active');
+        if (activeChild) {
+            const parentCollapse = collapse.closest('.nav-item').querySelector('[data-bs-toggle="collapse"]');
+            if (parentCollapse) {
+                parentCollapse.setAttribute('aria-expanded', 'true');
+                collapse.classList.add('show');
             }
         }
+    });
+}
+
+function handleMobileSidebar() {
+    // Close sidebar when clicking on a link in mobile view
+    if (window.innerWidth < 768) {
+        const navLinks = document.querySelectorAll('.sb-sidenav .nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                if (document.body.classList.contains('sb-sidenav-toggled')) {
+                    document.body.classList.remove('sb-sidenav-toggled');
+                }
+            });
+        });
     }
 }
 
-// Auto-generate equipment code
-function generateEquipmentCode() {
-    var year = new Date().getFullYear();
-    var random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return 'IT-' + year + '-' + random;
+// Enhanced sidebar toggle with animation
+function toggleSidebar() {
+    const sidebar = document.getElementById('layoutSidenav_nav');
+    const content = document.getElementById('layoutSidenav_content');
+    
+    document.body.classList.toggle('sb-sidenav-toggled');
+    localStorage.setItem('sb-sidenav-toggled', document.body.classList.contains('sb-sidenav-toggled'));
 }
 
-// Calculate remaining value for equipment
-function calculateRemainingValue(purchasePrice, purchaseDate) {
-    var currentDate = new Date();
-    var purchase = new Date(purchaseDate);
-    var yearsDiff = (currentDate - purchase) / (1000 * 60 * 60 * 24 * 365);
-    
-    // Assume depreciation of 20% per year
-    var depreciation = purchasePrice * 0.2 * yearsDiff;
-    var remainingValue = Math.max(0, purchasePrice - depreciation);
-    
-    return remainingValue.toFixed(2);
+// Function to check and set sidebar state
+function setSidebarState() {
+    const isToggled = localStorage.getItem('sb-sidenav-toggled') === 'true';
+    if (isToggled) {
+        document.body.classList.add('sb-sidenav-toggled');
+    } else {
+        document.body.classList.remove('sb-sidenav-toggled');
+    }
 }
+
+// Call this function on page load
+setSidebarState();
+
+// Export functions to global scope
+window.showToast = showToast;
+window.confirmAction = confirmAction;
+window.initializeDataTables = initializeDataTables;
+window.validateForm = validateForm;
+window.AjaxHelper = AjaxHelper;
+window.initializeChart = initializeChart;
+window.toggleSidebar = toggleSidebar;
+window.setSidebarState = setSidebarState;
 

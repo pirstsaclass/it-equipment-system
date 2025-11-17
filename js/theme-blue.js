@@ -1,253 +1,226 @@
-// Theme Blue JavaScript
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize sidebar toggle
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.body.classList.toggle('sb-sidenav-toggled');
-            localStorage.setItem('sb|sidebar-toggle', document.body.classList.contains('sb-sidenav-toggled'));
-        });
-    }
-
-    // Restore sidebar state
-    if (localStorage.getItem('sb|sidebar-toggle') === 'true') {
-        document.body.classList.add('sb-sidenav-toggled');
-    }
-
-    // Hide pre-loader when page is loaded
-    window.addEventListener('load', function() {
-        const loader = document.querySelector('.loader-bg');
-        if (loader) {
-            setTimeout(function() {
-                loader.style.opacity = '0';
-                setTimeout(function() {
-                    loader.style.display = 'none';
-                }, 300);
-            }, 500);
-        }
-    });
-
-    // Add active class to current page in sidebar
-    function setActiveSidebarItem() {
-        const currentPage = window.location.pathname.split('/').pop();
-        const navLinks = document.querySelectorAll('.sidebar .nav-link, .sidebar .nav-sub-link');
-        
-        navLinks.forEach(link => {
-            link.classList.remove('active');
-            const href = link.getAttribute('href');
-            if (href === currentPage) {
-                link.classList.add('active');
-                
-                // Expand parent collapse if it's a sub-link
-                const parentCollapse = link.closest('.collapse');
-                if (parentCollapse) {
-                    const parentLink = document.querySelector(`[href="#${parentCollapse.id}"]`);
-                    if (parentLink) {
-                        parentLink.classList.remove('collapsed');
-                        parentLink.setAttribute('aria-expanded', 'true');
-                        parentCollapse.classList.add('show');
-                    }
-                }
+    // Sidebar Toggle
+    const sidebarCollapse = document.getElementById('sidebarCollapse');
+    const sidebar = document.getElementById('sidebar');
+    const content = document.getElementById('content');
+    
+    if (sidebarCollapse) {
+        sidebarCollapse.addEventListener('click', function() {
+            sidebar.classList.toggle('active');
+            content.classList.toggle('active');
+            
+            // Change icon when sidebar is collapsed
+            const icon = this.querySelector('i');
+            if (sidebar.classList.contains('active')) {
+                icon.classList.remove('fa-align-left');
+                icon.classList.add('fa-align-right');
+            } else {
+                icon.classList.remove('fa-align-right');
+                icon.classList.add('fa-align-left');
             }
         });
     }
-
-    setActiveSidebarItem();
-
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    // Auto-dismiss alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        }, 5000);
-    });
-
-    // Confirm delete actions
-    const deleteButtons = document.querySelectorAll('[data-confirm-delete]');
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            if (!confirm('คุณแน่ใจหรือไม่ที่ต้องการลบรายการนี้?')) {
-                e.preventDefault();
-            }
-        });
-    });
-
-    // Form validation enhancement
-    const forms = document.querySelectorAll('.needs-validation');
-    forms.forEach(form => {
-        form.addEventListener('submit', function(event) {
-            if (!form.checkValidity()) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            form.classList.add('was-validated');
-        }, false);
-    });
-
-    // Auto-format numbers
-    const numberInputs = document.querySelectorAll('input[type="number"]');
-    numberInputs.forEach(input => {
-        input.addEventListener('blur', function() {
-            if (this.value) {
-                this.value = parseFloat(this.value).toLocaleString('th-TH');
-            }
-        });
-        
-        input.addEventListener('focus', function() {
-            if (this.value) {
-                this.value = this.value.replace(/,/g, '');
-            }
-        });
-    });
-
-    // Enhanced date picker initialization
-    const dateInputs = document.querySelectorAll('input[type="date"]');
-    dateInputs.forEach(input => {
-        // Add Thai date format display
-        input.addEventListener('change', function() {
-            if (this.value) {
-                const date = new Date(this.value);
-                const thaiDate = date.toLocaleDateString('th-TH', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                
-                // Create or update display element
-                let displayEl = this.nextElementSibling;
-                if (!displayEl || !displayEl.classList.contains('date-display')) {
-                    displayEl = document.createElement('small');
-                    displayEl.className = 'date-display form-text text-muted mt-1';
-                    this.parentNode.appendChild(displayEl);
-                }
-                displayEl.textContent = thaiDate;
-            }
-        });
-    });
-
-    // Table row selection
-    const selectableTables = document.querySelectorAll('table[data-selectable="true"]');
-    selectableTables.forEach(table => {
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            row.addEventListener('click', function() {
-                this.classList.toggle('table-primary');
-            });
-        });
-    });
-
-    // Print functionality
-    const printButtons = document.querySelectorAll('[data-print]');
-    printButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const printSection = document.querySelector(this.dataset.print);
-            if (printSection) {
-                const printContent = printSection.innerHTML;
-                const originalContent = document.body.innerHTML;
-                
-                document.body.innerHTML = printContent;
-                window.print();
-                document.body.innerHTML = originalContent;
-                location.reload();
-            }
-        });
-    });
-
-    // Export to Excel functionality
-    const exportButtons = document.querySelectorAll('[data-export]');
-    exportButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const tableId = this.dataset.export;
-            const table = document.getElementById(tableId);
-            if (table) {
-                let csv = [];
-                const rows = table.querySelectorAll('tr');
-                
-                for (let i = 0; i < rows.length; i++) {
-                    let row = [], cols = rows[i].querySelectorAll('td, th');
-                    
-                    for (let j = 0; j < cols.length; j++) {
-                        let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ');
-                        data = data.replace(/"/g, '""');
-                        row.push('"' + data + '"');
-                    }
-                    
-                    csv.push(row.join(','));
-                }
-                
-                const csvString = csv.join('\n');
-                const filename = `export-${new Date().toISOString().split('T')[0]}.csv`;
-                
-                const link = document.createElement('a');
-                link.style.display = 'none';
-                link.setAttribute('target', '_blank');
-                link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvString));
-                link.setAttribute('download', filename);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        });
-    });
+    
+    // Initialize Charts
+    initializeCharts();
+    
+    // Handle dropdown menus
+    initializeDropdowns();
+    
+    // Handle responsive behavior
+    handleResponsive();
 });
 
-// Utility functions
-function showToast(message, type = 'success') {
-    // Create toast container if it doesn't exist
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
+// Initialize Chart.js charts
+function initializeCharts() {
+    // Area Chart
+    const areaChartCtx = document.getElementById('myAreaChart');
+    if (areaChartCtx) {
+        new Chart(areaChartCtx, {
+            type: 'line',
+            data: {
+                labels: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
+                datasets: [{
+                    label: 'รายได้',
+                    lineTension: 0.3,
+                    backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                    borderColor: 'rgba(78, 115, 223, 1)',
+                    pointRadius: 3,
+                    pointBackgroundColor: 'rgba(78, 115, 223, 1)',
+                    pointBorderColor: 'rgba(78, 115, 223, 1)',
+                    pointHoverRadius: 3,
+                    pointHoverBackgroundColor: 'rgba(78, 115, 223, 1)',
+                    pointHoverBorderColor: 'rgba(78, 115, 223, 1)',
+                    pointHitRadius: 10,
+                    pointBorderWidth: 2,
+                    data: [65000, 79000, 80000, 81000, 86000, 95000, 98000, 105000, 115000, 120000, 125000, 130000],
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 25,
+                        top: 25,
+                        bottom: 0
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            maxTicksLimit: 5,
+                            padding: 10,
+                            callback: function(value) {
+                                return '฿' + value.toLocaleString();
+                            }
+                        },
+                        grid: {
+                            color: "rgb(234, 236, 244)",
+                            drawBorder: false,
+                            borderDash: [2],
+                            zeroLineBorderDash: [2]
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: "rgb(255,255,255)",
+                        bodyColor: "#858796",
+                        titleColor: '#6e707e',
+                        borderColor: '#dddfeb',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return 'รายได้: ฿' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
+    
+    // Pie Chart
+    const pieChartCtx = document.getElementById('myPieChart');
+    if (pieChartCtx) {
+        new Chart(pieChartCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['โซเชียลมีเดีย', 'อีเมล', 'เว็บไซต์'],
+                datasets: [{
+                    data: [55, 30, 15],
+                    backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc'],
+                    hoverBackgroundColor: ['#2e59d9', '#17a673', '#2c9faf'],
+                    hoverBorderColor: "rgba(234, 236, 244, 1)",
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: "rgb(255,255,255)",
+                        bodyColor: "#858796",
+                        borderColor: '#dddfeb',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed + '%';
+                            }
+                        }
+                    }
+                },
+                cutout: '80%',
+            },
+        });
+    }
+}
 
-    // Create toast element
-    const toastEl = document.createElement('div');
-    toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
-    toastEl.setAttribute('role', 'alert');
-    toastEl.setAttribute('aria-live', 'assertive');
-    toastEl.setAttribute('aria-atomic', 'true');
+// Initialize dropdown functionality
+function initializeDropdowns() {
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.matches('.dropdown-toggle')) {
+            const dropdowns = document.getElementsByClassName('dropdown-menu');
+            for (let i = 0; i < dropdowns.length; i++) {
+                const openDropdown = dropdowns[i];
+                if (openDropdown.classList.contains('show')) {
+                    openDropdown.classList.remove('show');
+                }
+            }
+        }
+    });
     
-    toastEl.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${message}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
-    `;
-
-    toastContainer.appendChild(toastEl);
-    
-    const toast = new bootstrap.Toast(toastEl);
-    toast.show();
-    
-    // Remove toast after hide
-    toastEl.addEventListener('hidden.bs.toast', function() {
-        toastEl.remove();
+    // Add animation to dropdowns
+    const dropdowns = document.querySelectorAll('.dropdown');
+    dropdowns.forEach(dropdown => {
+        dropdown.addEventListener('show.bs.dropdown', function() {
+            this.querySelector('.dropdown-menu').classList.add('animated--fade-in');
+        });
     });
 }
 
-function confirmAction(message = 'คุณแน่ใจหรือไม่?') {
-    return confirm(message);
-}
-
-function formatNumber(num) {
-    return new Intl.NumberFormat('th-TH').format(num);
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('th-TH', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+// Handle responsive behavior
+function handleResponsive() {
+    // Auto-close sidebar on small screens when clicking a link
+    const sidebarLinks = document.querySelectorAll('#sidebar a');
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('active');
+                document.getElementById('content').classList.add('active');
+                
+                const sidebarCollapseBtn = document.getElementById('sidebarCollapse');
+                if (sidebarCollapseBtn) {
+                    const icon = sidebarCollapseBtn.querySelector('i');
+                    icon.classList.remove('fa-align-right');
+                    icon.classList.add('fa-align-left');
+                }
+            }
+        });
     });
+    
+    // Handle window resize
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            document.getElementById('sidebar').classList.remove('active');
+            document.getElementById('content').classList.remove('active');
+            
+            const sidebarCollapseBtn = document.getElementById('sidebarCollapse');
+            if (sidebarCollapseBtn) {
+                const icon = sidebarCollapseBtn.querySelector('i');
+                icon.classList.remove('fa-align-right');
+                icon.classList.add('fa-align-left');
+            }
+        }
+    });
+}
+
+// Utility function to toggle dark mode (optional)
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    
+    // You can add more specific dark mode styles as needed
+    if (document.body.classList.contains('dark-mode')) {
+        localStorage.setItem('darkMode', 'enabled');
+    } else {
+        localStorage.setItem('darkMode', 'disabled');
+    }
+}
+
+// Check for saved dark mode preference
+if (localStorage.getItem('darkMode') === 'enabled') {
+    document.body.classList.add('dark-mode');
 }
