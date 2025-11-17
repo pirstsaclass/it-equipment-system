@@ -89,7 +89,7 @@ if ($action == 'delete' && $id > 0) {
     }
 }
 
-// ดึงข้อมูลสำหรับแก้ไข
+// ดึงข้อมูลสำหรับแก้ไข (ใช้สำหรับ Modal)
 $equipment_data = [];
 if ($action == 'edit' && $id > 0) {
     $stmt = $db->prepare("SELECT * FROM equipment_classroom WHERE id = ?");
@@ -183,22 +183,12 @@ include 'includes/sidebar.php';
 <main >
     <div class="container-fluid px-4">
 
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">
-            <?php 
-            if ($action == 'edit') echo "แก้ไขการจัดวางครุภัณฑ์";
-            else echo "จัดการครุภัณฑ์ในห้องเรียน";
-            ?>
-        </h1>
-        <?php if ($action == 'list'): ?>
-            <button type="button" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addEquipmentModal">
-                <i class="fas fa-plus fa-sm text-white-50"></i> เพิ่มการจัดวาง
-            </button>
-        <?php else: ?>
-            <a href="equipment_classroom.php" class="d-none d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
-                <i class="fas fa-arrow-left fa-sm text-white-50"></i> กลับหน้ารายการ
-            </a>
-        <?php endif; ?>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">จัดการครุภัณฑ์ในห้องเรียน</h1>
+
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEquipmentModal">
+            <i class="fas fa-plus fa-sm text-white-50"></i> เพิ่มการจัดวาง
+        </button>
     </div>
 
     <?php if (isset($_SESSION['error'])): ?>
@@ -215,289 +205,166 @@ include 'includes/sidebar.php';
         </div>
     <?php endif; ?>
 
-    <?php if ($action == 'edit'): ?>
-        <!-- แสดงฟอร์มแก้ไข (แบบเต็มหน้า) -->
-        <div class="card shadow mb-4">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">ข้อมูลการจัดวางครุภัณฑ์</h6>
-            </div>
-            <div class="card-body">
-                <form method="POST" id="editForm">
-                    <input type="hidden" name="action" value="edit">
-                    <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">รหัสครุภัณฑ์ <span class="text-danger">*</span></label>
-                                <select class="form-control" name="equipment_code" id="equipment_code" required>
-                                    <option value="">-- เลือกครุภัณฑ์ --</option>
-                                    <?php foreach($equipment_options as $equip): ?>
-                                        <option value="<?php echo htmlspecialchars($equip['equipment_code']); ?>" 
-                                                <?php echo ($equipment_data['equipment_code'] ?? '') == $equip['equipment_code'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($equip['equipment_code'] . ' - ' . $equip['equipment_name']); ?>
-                                            <?php if (!empty($equip['brand_name'])): ?>
-                                                (<?php echo htmlspecialchars($equip['brand_name']); ?>)
-                                            <?php endif; ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">โรงเรียน <span class="text-danger">*</span></label>
-                                <select class="form-control" name="school_name" id="school_name" required onchange="updateBuildingsAndFloors()">
-                                    <option value="">-- เลือกโรงเรียน --</option>
-                                    <?php foreach($school_list as $school): ?>
-                                        <option value="<?php echo htmlspecialchars($school['school_name']); ?>" 
-                                                <?php echo ($equipment_data['school_name'] ?? '') == $school['school_name'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($school['school_name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">อาคาร <span class="text-danger">*</span></label>
-                                <select class="form-control" name="building_name" id="building_name" required onchange="updateFloors()">
-                                    <option value="">-- เลือกอาคาร --</option>
-                                    <!-- อาคารจะถูกโหลดโดย JavaScript -->
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">ชั้น <span class="text-danger">*</span></label>
-                                <select class="form-control" name="floor_level" id="floor_level" required>
-                                    <option value="">-- เลือกชั้น --</option>
-                                    <!-- ชั้นจะถูกโหลดโดย JavaScript -->
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">หมายเลขห้อง <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="room_number" 
-                                       value="<?php echo htmlspecialchars($equipment_data['room_number'] ?? ''); ?>" required>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">ชื่อห้อง</label>
-                                <input type="text" class="form-control" name="room_name" 
-                                       value="<?php echo htmlspecialchars($equipment_data['room_name'] ?? ''); ?>">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">จำนวนครุภัณฑ์ <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" name="equipment_quantity" min="1" 
-                                       value="<?php echo $equipment_data['equipment_quantity'] ?? 1; ?>" required>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">วันที่ติดตั้ง</label>
-                                <input type="date" class="form-control" name="installation_date" 
-                                       value="<?php echo $equipment_data['installation_date'] ?? ''; ?>">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">วันที่บันทึก</label>
-                                <input type="text" class="form-control" 
-                                       value="<?php echo isset($equipment_data['created_at']) ? date('d/m/Y H:i', strtotime($equipment_data['created_at'])) : date('d/m/Y H:i'); ?>" readonly>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">หมายเหตุการจัดวาง</label>
-                        <textarea class="form-control" name="placement_notes" rows="3"><?php echo htmlspecialchars($equipment_data['placement_notes'] ?? ''); ?></textarea>
-                    </div>
-
-                    <div class="d-flex justify-content-between">
-                        <a href="equipment_classroom.php" class="btn btn-secondary">ยกเลิก</a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> อัพเดท
-                        </button>
-                    </div>
-                </form>
+    <!-- แสดงรายการ -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">รายการการจัดวางครุภัณฑ์</h6>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportToExcel()">
+                    <i class="fas fa-file-excel"></i> Export Excel
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="printTable()">
+                    <i class="fas fa-print"></i> พิมพ์
+                </button>
             </div>
         </div>
-    <?php else: ?>
-        <!-- แสดงรายการ -->
-        <div class="card shadow mb-4">
-            <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                <h6 class="m-0 font-weight-bold text-primary">รายการการจัดวางครุภัณฑ์</h6>
-                <div class="btn-group">
-                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportToExcel()">
-                        <i class="fas fa-file-excel"></i> Export Excel
-                    </button>
-                    <button type="button" class="btn btn-outline-success btn-sm" onclick="printTable()">
-                        <i class="fas fa-print"></i> พิมพ์
-                    </button>
+        <div class="card-body">
+            <!-- Real-time Filter Section -->
+            <div class="card mb-4 border-primary">
+                <div class="card-header bg-light py-2">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-filter"></i> ตัวกรองข้อมูลแบบ Real-time
+                    </h6>
                 </div>
-            </div>
-            <div class="card-body">
-                <!-- Real-time Filter Section -->
-                <div class="card mb-4 border-primary">
-                    <div class="card-header bg-light py-2">
-                        <h6 class="m-0 font-weight-bold text-primary">
-                            <i class="fas fa-filter"></i> ตัวกรองข้อมูลแบบ Real-time
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">ค้นหาทั่วไป</label>
-                                <input type="text" class="form-control" id="globalSearch" placeholder="ค้นหาทั้งตาราง..." onkeyup="filterTable()">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">โรงเรียน</label>
-                                <select class="form-control" id="schoolFilter" onchange="filterTable()">
-                                    <option value="">ทั้งหมด</option>
-                                    <?php foreach($school_list as $school): ?>
-                                        <option value="<?php echo htmlspecialchars($school['school_name']); ?>">
-                                            <?php echo htmlspecialchars($school['school_name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">อาคาร</label>
-                                <select class="form-control" id="buildingFilter" onchange="filterTable()">
-                                    <option value="">ทั้งหมด</option>
-                                    <?php foreach($building_list as $building): ?>
-                                        <option value="<?php echo htmlspecialchars($building); ?>">
-                                            <?php echo htmlspecialchars($building); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">จำนวนครุภัณฑ์</label>
-                                <select class="form-control" id="quantityFilter" onchange="filterTable()">
-                                    <option value="">ทั้งหมด</option>
-                                    <option value="1">1 ชิ้น</option>
-                                    <option value="2">2 ชิ้น</option>
-                                    <option value="3">3 ชิ้นขึ้นไป</option>
-                                </select>
-                            </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">ค้นหาทั่วไป</label>
+                            <input type="text" class="form-control" id="globalSearch" placeholder="ค้นหาทั้งตาราง..." onkeyup="filterTable()">
                         </div>
-                        <div class="row mt-3">
-                            <div class="col-12">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
-                                            <i class="fas fa-redo"></i> ล้างตัวกรอง
-                                        </button>
-                                        <span class="ms-3 text-muted small" id="filterResultCount"></span>
-                                    </div>
-                                    <div class="text-muted small">
-                                        <span id="currentTime"></span>
-                                    </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">โรงเรียน</label>
+                            <select class="form-control" id="schoolFilter" onchange="filterTable()">
+                                <option value="">ทั้งหมด</option>
+                                <?php foreach($school_list as $school): ?>
+                                    <option value="<?php echo htmlspecialchars($school['school_name']); ?>">
+                                        <?php echo htmlspecialchars($school['school_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">อาคาร</label>
+                            <select class="form-control" id="buildingFilter" onchange="filterTable()">
+                                <option value="">ทั้งหมด</option>
+                                <?php foreach($building_list as $building): ?>
+                                    <option value="<?php echo htmlspecialchars($building); ?>">
+                                        <?php echo htmlspecialchars($building); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">จำนวนครุภัณฑ์</label>
+                            <select class="form-control" id="quantityFilter" onchange="filterTable()">
+                                <option value="">ทั้งหมด</option>
+                                <option value="1">1 ชิ้น</option>
+                                <option value="2">2 ชิ้น</option>
+                                <option value="3">3 ชิ้นขึ้นไป</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                                        <i class="fas fa-redo"></i> ล้างตัวกรอง
+                                    </button>
+                                    <span class="ms-3 text-muted small" id="filterResultCount"></span>
+                                </div>
+                                <div class="text-muted small">
+                                    <span id="currentTime"></span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover" id="equipmentTable" width="100%" cellspacing="0">
-                        <thead class="table-light">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="equipmentTable" width="100%" cellspacing="0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>รหัสครุภัณฑ์</th>
+                            <th>ชื่อครุภัณฑ์</th>
+                            <th>โรงเรียน</th>
+                            <th>อาคาร/ชั้น</th>
+                            <th>ห้อง</th>
+                            <th>จำนวน</th>
+                            <th>วันที่ติดตั้ง</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (count($equipment_list) > 0): ?>
+                            <?php foreach($equipment_list as $item): ?>
                             <tr>
-                                <th>รหัสครุภัณฑ์</th>
-                                <th>ชื่อครุภัณฑ์</th>
-                                <th>โรงเรียน</th>
-                                <th>อาคาร/ชั้น</th>
-                                <th>ห้อง</th>
-                                <th>จำนวน</th>
-                                <th>วันที่ติดตั้ง</th>
-                                <th>จัดการ</th>
+                                <td class="fw-bold"><?php echo htmlspecialchars($item['equipment_code']); ?></td>
+                                <td>
+                                    <div class="fw-bold"><?php echo htmlspecialchars($item['equipment_name'] ?? '-'); ?></div>
+                                    <?php if (!empty($item['brand_name'])): ?>
+                                        <small class="text-muted"><?php echo htmlspecialchars($item['brand_name']); ?></small>
+                                        <?php if (!empty($item['model_name'])): ?>
+                                            <small class="text-muted"> - <?php echo htmlspecialchars($item['model_name']); ?></small>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo htmlspecialchars($item['school_name']); ?></td>
+                                <td>
+                                    <div><?php echo htmlspecialchars($item['building_name']); ?></div>
+                                    <small class="text-muted">ชั้น <?php echo htmlspecialchars($item['floor_level']); ?></small>
+                                </td>
+                                <td>
+                                    <div class="fw-bold"><?php echo htmlspecialchars($item['room_number']); ?></div>
+                                    <?php if (!empty($item['room_name'])): ?>
+                                        <small class="text-muted"><?php echo htmlspecialchars($item['room_name']); ?></small>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary"><?php echo $item['equipment_quantity']; ?></span>
+                                </td>
+                                <td>
+                                    <?php echo !empty($item['installation_date']) ? date('d/m/Y', strtotime($item['installation_date'])) : '-'; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-primary" title="แก้ไข" 
+                                                onclick="openEditModal(<?php echo $item['id']; ?>)">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <a href="equipment_classroom.php?action=delete&id=<?php echo $item['id']; ?>" 
+                                           class="btn btn-danger" title="ลบ"
+                                           onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลนี้?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (count($equipment_list) > 0): ?>
-                                <?php foreach($equipment_list as $item): ?>
-                                <tr>
-                                    <td class="fw-bold"><?php echo htmlspecialchars($item['equipment_code']); ?></td>
-                                    <td>
-                                        <div class="fw-bold"><?php echo htmlspecialchars($item['equipment_name'] ?? '-'); ?></div>
-                                        <?php if (!empty($item['brand_name'])): ?>
-                                            <small class="text-muted"><?php echo htmlspecialchars($item['brand_name']); ?></small>
-                                            <?php if (!empty($item['model_name'])): ?>
-                                                <small class="text-muted"> - <?php echo htmlspecialchars($item['model_name']); ?></small>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo htmlspecialchars($item['school_name']); ?></td>
-                                    <td>
-                                        <div><?php echo htmlspecialchars($item['building_name']); ?></div>
-                                        <small class="text-muted">ชั้น <?php echo htmlspecialchars($item['floor_level']); ?></small>
-                                    </td>
-                                    <td>
-                                        <div class="fw-bold"><?php echo htmlspecialchars($item['room_number']); ?></div>
-                                        <?php if (!empty($item['room_name'])): ?>
-                                            <small class="text-muted"><?php echo htmlspecialchars($item['room_name']); ?></small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-primary"><?php echo $item['equipment_quantity']; ?></span>
-                                    </td>
-                                    <td>
-                                        <?php echo !empty($item['installation_date']) ? date('d/m/Y', strtotime($item['installation_date'])) : '-'; ?>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="equipment_classroom.php?action=edit&id=<?php echo $item['id']; ?>" 
-                                               class="btn btn-primary" title="แก้ไข">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="equipment_classroom.php?action=delete&id=<?php echo $item['id']; ?>" 
-                                               class="btn btn-danger" title="ลบ"
-                                               onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลนี้?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
-                                        <i class="fas fa-inbox fa-2x mb-2"></i><br>
-                                        ไม่พบข้อมูลการจัดวางครุภัณฑ์
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                    ไม่พบข้อมูลการจัดวางครุภัณฑ์
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
 
-                <!-- No Results Message -->
-                <div id="noResults" class="text-center py-4" style="display: none;">
-                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">ไม่พบข้อมูลที่ตรงกับการค้นหา</h5>
-                    <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
-                    <button type="button" class="btn btn-outline-primary" onclick="clearFilters()">
-                        <i class="fas fa-redo"></i> ล้างตัวกรอง
-                    </button>
-                </div>
+            <!-- No Results Message -->
+            <div id="noResults" class="text-center py-4" style="display: none;">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">ไม่พบข้อมูลที่ตรงกับการค้นหา</h5>
+                <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
+                <button type="button" class="btn btn-outline-primary" onclick="clearFilters()">
+                    <i class="fas fa-redo"></i> ล้างตัวกรอง
+                </button>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 </main>
 
 <!-- Modal สำหรับเพิ่มข้อมูล -->
@@ -616,6 +483,123 @@ include 'includes/sidebar.php';
     </div>
 </div>
 
+<!-- Modal สำหรับแก้ไขข้อมูล -->
+<div class="modal fade" id="editEquipmentModal" tabindex="-1" aria-labelledby="editEquipmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" id="editForm">
+                <input type="hidden" name="action" value="edit">
+                <input type="hidden" name="id" id="edit_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editEquipmentModalLabel">แก้ไขการจัดวางครุภัณฑ์</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">รหัสครุภัณฑ์ <span class="text-danger">*</span></label>
+                                <select class="form-control" name="equipment_code" id="edit_equipment_code" required>
+                                    <option value="">-- เลือกครุภัณฑ์ --</option>
+                                    <?php foreach($equipment_options as $equip): ?>
+                                        <option value="<?php echo htmlspecialchars($equip['equipment_code']); ?>">
+                                            <?php echo htmlspecialchars($equip['equipment_code'] . ' - ' . $equip['equipment_name']); ?>
+                                            <?php if (!empty($equip['brand_name'])): ?>
+                                                (<?php echo htmlspecialchars($equip['brand_name']); ?>)
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">โรงเรียน <span class="text-danger">*</span></label>
+                                <select class="form-control" name="school_name" id="edit_school_name" required onchange="updateEditBuildingsAndFloors()">
+                                    <option value="">-- เลือกโรงเรียน --</option>
+                                    <?php foreach($school_list as $school): ?>
+                                        <option value="<?php echo htmlspecialchars($school['school_name']); ?>">
+                                            <?php echo htmlspecialchars($school['school_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">อาคาร <span class="text-danger">*</span></label>
+                                <select class="form-control" name="building_name" id="edit_building_name" required onchange="updateEditFloors()">
+                                    <option value="">-- เลือกอาคาร --</option>
+                                    <!-- อาคารจะถูกโหลดโดย JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">ชั้น <span class="text-danger">*</span></label>
+                                <select class="form-control" name="floor_level" id="edit_floor_level" required>
+                                    <option value="">-- เลือกชั้น --</option>
+                                    <!-- ชั้นจะถูกโหลดโดย JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">หมายเลขห้อง <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="room_number" id="edit_room_number" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">ชื่อห้อง</label>
+                                <input type="text" class="form-control" name="room_name" id="edit_room_name">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">จำนวนครุภัณฑ์ <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" name="equipment_quantity" id="edit_equipment_quantity" min="1" value="1" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">วันที่ติดตั้ง</label>
+                                <input type="date" class="form-control" name="installation_date" id="edit_installation_date">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">วันที่บันทึก</label>
+                                <input type="text" class="form-control" id="edit_created_at" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">หมายเหตุการจัดวาง</label>
+                        <textarea class="form-control" name="placement_notes" id="edit_placement_notes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> อัพเดท
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 // ข้อมูลโรงเรียน ตึก และชั้น
 const schoolData = {
@@ -645,6 +629,79 @@ const schoolData = {
         ]
     }
 };
+
+// ฟังก์ชันเปิด Modal แก้ไข (แบบไม่ใช้ AJAX)
+function openEditModal(id) {
+    // หาแถวในตารางที่ตรงกับ ID
+    const rows = document.querySelectorAll('#equipmentTable tbody tr');
+    let foundData = null;
+    
+    rows.forEach(row => {
+        const editButton = row.querySelector('button[onclick*="openEditModal"]');
+        if (editButton) {
+            const buttonOnclick = editButton.getAttribute('onclick');
+            const match = buttonOnclick.match(/openEditModal\((\d+)\)/);
+            if (match && match[1] == id) {
+                // ดึงข้อมูลจากแถว
+                const cells = row.cells;
+                foundData = {
+                    equipment_code: cells[0].textContent.trim(),
+                    equipment_name: cells[1].querySelector('.fw-bold').textContent.trim(),
+                    school_name: cells[2].textContent.trim(),
+                    building_name: cells[3].querySelector('div').textContent.trim(),
+                    floor_level: cells[3].querySelector('small').textContent.replace('ชั้น ', '').trim(),
+                    room_number: cells[4].querySelector('.fw-bold').textContent.trim(),
+                    room_name: cells[4].querySelector('small') ? cells[4].querySelector('small').textContent.trim() : '',
+                    equipment_quantity: cells[5].querySelector('.badge').textContent.trim(),
+                    installation_date: cells[6].textContent.trim() !== '-' ? 
+                        formatDateForInput(cells[6].textContent.trim()) : ''
+                };
+            }
+        }
+    });
+    
+    if (foundData) {
+        // เติมข้อมูลลงในฟอร์มแก้ไข
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_equipment_code').value = foundData.equipment_code;
+        document.getElementById('edit_school_name').value = foundData.school_name;
+        document.getElementById('edit_room_number').value = foundData.room_number;
+        document.getElementById('edit_room_name').value = foundData.room_name;
+        document.getElementById('edit_equipment_quantity').value = foundData.equipment_quantity;
+        document.getElementById('edit_installation_date').value = foundData.installation_date;
+        
+        // อัพเดทอาคารและชั้น
+        updateEditBuildingsAndFloors();
+        
+        // รอให้ DOM อัพเดทแล้วค่อยตั้งค่าอาคารและชั้น
+        setTimeout(() => {
+            document.getElementById('edit_building_name').value = foundData.building_name;
+            updateEditFloors();
+            
+            setTimeout(() => {
+                document.getElementById('edit_floor_level').value = foundData.floor_level;
+                
+                // แสดง Modal
+                const editModal = new bootstrap.Modal(document.getElementById('editEquipmentModal'));
+                editModal.show();
+            }, 100);
+        }, 100);
+    } else {
+        alert('ไม่พบข้อมูลที่ต้องการแก้ไข');
+    }
+}
+
+// ฟังก์ชันแปลงวันที่จากรูปแบบไทยเป็นรูปแบบ input date
+function formatDateForInput(thaiDate) {
+    if (!thaiDate) return '';
+    
+    // แปลงจาก dd/mm/yyyy เป็น yyyy-mm-dd
+    const parts = thaiDate.split('/');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return '';
+}
 
 // Real-time Filter Functions
 function filterTable() {
@@ -827,20 +884,11 @@ function updateCurrentTime() {
         })}`;
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    updateCurrentTime();
-    setInterval(updateCurrentTime, 60000); // Update every minute
-    
-    // Initialize filter result count
-    filterTable();
-});
-
-// ฟังก์ชันสำหรับหน้าแก้ไข
-function updateBuildingsAndFloors() {
-    const schoolSelect = document.getElementById('school_name');
-    const buildingSelect = document.getElementById('building_name');
-    const floorSelect = document.getElementById('floor_level');
+// ฟังก์ชันสำหรับ Modal แก้ไข
+function updateEditBuildingsAndFloors() {
+    const schoolSelect = document.getElementById('edit_school_name');
+    const buildingSelect = document.getElementById('edit_building_name');
+    const floorSelect = document.getElementById('edit_floor_level');
     
     const selectedSchool = schoolSelect.value;
     
@@ -859,10 +907,10 @@ function updateBuildingsAndFloors() {
     }
 }
 
-function updateFloors() {
-    const schoolSelect = document.getElementById('school_name');
-    const buildingSelect = document.getElementById('building_name');
-    const floorSelect = document.getElementById('floor_level');
+function updateEditFloors() {
+    const schoolSelect = document.getElementById('edit_school_name');
+    const buildingSelect = document.getElementById('edit_building_name');
+    const floorSelect = document.getElementById('edit_floor_level');
     
     const selectedSchool = schoolSelect.value;
     const selectedBuilding = buildingSelect.value;
@@ -884,7 +932,7 @@ function updateFloors() {
     }
 }
 
-// ฟังก์ชันสำหรับ Modal
+// ฟังก์ชันสำหรับ Modal เพิ่ม
 function updateModalBuildingsAndFloors() {
     const schoolSelect = document.getElementById('modal_school_name');
     const buildingSelect = document.getElementById('modal_building_name');
@@ -932,52 +980,15 @@ function updateModalFloors() {
     }
 }
 
-// เรียกฟังก์ชันเมื่อโหลดหน้าเว็บเพื่อตั้งค่าค่าเริ่มต้น (สำหรับหน้าแก้ไข)
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // สำหรับหน้าแก้ไข
-    if (document.getElementById('school_name')) {
-        updateBuildingsAndFloors();
-        
-        // ตั้งค่าค่าที่เลือกไว้ (ถ้ามี) สำหรับหน้าแก้ไข
-        const buildingName = '<?php echo htmlspecialchars($equipment_data["building_name"] ?? ""); ?>';
-        const floorLevel = '<?php echo htmlspecialchars($equipment_data["floor_level"] ?? ""); ?>';
-        
-        if (buildingName) {
-            setTimeout(() => {
-                const buildingSelect = document.getElementById('building_name');
-                buildingSelect.value = buildingName;
-                updateFloors();
-                
-                if (floorLevel) {
-                    setTimeout(() => {
-                        const floorSelect = document.getElementById('floor_level');
-                        floorSelect.value = floorLevel;
-                    }, 100);
-                }
-            }, 100);
-        }
-    }
-
-    // เพิ่ม validation สำหรับฟอร์ม
-    const editForm = document.getElementById('editForm');
-    if (editForm) {
-        editForm.addEventListener('submit', function(e) {
-            const equipmentCode = document.getElementById('equipment_code').value;
-            const schoolName = document.getElementById('school_name').value;
-            const buildingName = document.getElementById('building_name').value;
-            const floorLevel = document.getElementById('floor_level').value;
-            const roomNumber = document.querySelector('input[name="room_number"]').value;
-            const quantity = document.querySelector('input[name="equipment_quantity"]').value;
-            
-            if (!equipmentCode || !schoolName || !buildingName || !floorLevel || !roomNumber || quantity <= 0) {
-                e.preventDefault();
-                alert('กรุณากรอกข้อมูลให้ครบถ้วน');
-                return false;
-            }
-        });
-    }
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 60000); // Update every minute
     
-    // สำหรับฟอร์มเพิ่ม (modal)
+    // Initialize filter result count
+    filterTable();
+    
+    // เพิ่ม validation สำหรับฟอร์ม
     const addForm = document.getElementById('addForm');
     if (addForm) {
         addForm.addEventListener('submit', function(e) {
@@ -995,7 +1006,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Validation สำหรับฟอร์มแก้ไข
+    const editForm = document.getElementById('editForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            const equipmentCode = document.getElementById('edit_equipment_code').value;
+            const schoolName = document.getElementById('edit_school_name').value;
+            const buildingName = document.getElementById('edit_building_name').value;
+            const floorLevel = document.getElementById('edit_floor_level').value;
+            const roomNumber = document.getElementById('edit_room_number').value;
+            const quantity = document.getElementById('edit_equipment_quantity').value;
+            
+            if (!equipmentCode || !schoolName || !buildingName || !floorLevel || !roomNumber || quantity <= 0) {
+                e.preventDefault();
+                alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+                return false;
+            }
+        });
+    }
 });
+
+
 </script>
 
 <?php include 'includes/footer.php'; ?>

@@ -198,6 +198,251 @@ if ($_POST) {
     }
 }
 
+// Handle Import Equipment
+if (isset($_POST['import_equipment'])) {
+    try {
+        if (isset($_FILES['import_file']) && $_FILES['import_file']['error'] == 0) {
+            $file = $_FILES['import_file'];
+            $duplicate_action = $_POST['duplicate_action'] ?? 'skip';
+            
+            // Check file type
+            $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowed_ext = ['xlsx', 'xls', 'csv'];
+            
+            if (!in_array($file_ext, $allowed_ext)) {
+                $_SESSION['error'] = "รองรับเฉพาะไฟล์ Excel และ CSV เท่านั้น";
+                header("Location: equipment.php");
+                exit();
+            }
+            
+            // File size check (10MB)
+            if ($file['size'] > 10 * 1024 * 1024) {
+                $_SESSION['error'] = "ขนาดไฟล์ต้องไม่เกิน 10MB";
+                header("Location: equipment.php");
+                exit();
+            }
+            
+            // Process file based on type
+            $import_results = [
+                'total' => 0,
+                'success' => 0,
+                'skipped' => 0,
+                'errors' => []
+            ];
+            
+            if ($file_ext == 'csv') {
+                $import_results = importFromCSV($file['tmp_name'], $duplicate_action, $db);
+            } else {
+                $import_results = importFromExcel($file['tmp_name'], $duplicate_action, $db);
+            }
+            
+            // Set session message with results
+            $message = "Import สำเร็จ: " . $import_results['success'] . " รายการ";
+            if ($import_results['skipped'] > 0) {
+                $message .= ", ข้าม: " . $import_results['skipped'] . " รายการ";
+            }
+            if ($import_results['total'] > 0) {
+                $message .= ", ทั้งหมด: " . $import_results['total'] . " รายการ";
+            }
+            
+            $_SESSION['success'] = $message;
+            
+            // Store errors in session if any
+            if (!empty($import_results['errors'])) {
+                $_SESSION['import_errors'] = $import_results['errors'];
+            }
+            
+        } else {
+            $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัพโหลดไฟล์";
+        }
+    } catch (Exception $e) {
+        $_SESSION['error'] = "เกิดข้อผิดพลาดในการ Import: " . $e->getMessage();
+    }
+    
+    header("Location: equipment.php");
+    exit();
+}
+
+// Function to import from CSV
+function importFromCSV($file_path, $duplicate_action, $db) {
+    $results = [
+        'total' => 0,
+        'success' => 0,
+        'skipped' => 0,
+        'errors' => []
+    ];
+    
+    if (($handle = fopen($file_path, "r")) !== FALSE) {
+        $headers = fgetcsv($handle); // Read headers
+        
+        // Map column names
+        $column_map = [
+            'รหัสครุภัณฑ์' => 'equipment_code',
+            'ชื่อครุภัณฑ์' => 'equipment_name',
+            'หมวดหมู่' => 'category_name',
+            'หมวดหมู่ย่อย' => 'subcategory_name',
+            'ยี่ห้อ' => 'brand_name',
+            'รุ่น' => 'model_name',
+            'หมายเลขซีเรียล' => 'serial_number',
+            'วันที่ซื้อ' => 'purchase_date',
+            'วันที่หมดประกัน' => 'warranty_expiry_date',
+            'ราคาซื้อ' => 'purchase_price',
+            'ผู้จำหน่าย' => 'supplier_name',
+            'สถานะครุภัณฑ์' => 'equipment_status',
+            'โรงเรียน' => 'location_school',
+            'ตึก/อาคาร' => 'location_building',
+            'ชั้น' => 'location_floor',
+            'ห้อง' => 'location_room',
+            'ผู้รับผิดชอบ' => 'responsible_person',
+            'หมายเหตุ' => 'notes'
+        ];
+        
+        $row_num = 1;
+        while (($data = fgetcsv($handle)) !== FALSE) {
+            $row_num++;
+            $results['total']++;
+            
+            try {
+                // Map data to columns
+                $equipment_data = [];
+                foreach ($headers as $index => $header) {
+                    $clean_header = trim($header);
+                    if (isset($column_map[$clean_header]) && isset($data[$index])) {
+                        $equipment_data[$column_map[$clean_header]] = trim($data[$index]);
+                    }
+                }
+                
+                // Validate required fields
+                if (empty($equipment_data['equipment_code']) || empty($equipment_data['equipment_name'])) {
+                    $results['errors'][] = "แถว $row_num: ขาดข้อมูลรหัสครุภัณฑ์หรือชื่อครุภัณฑ์";
+                    $results['skipped']++;
+                    continue;
+                }
+                
+                // Handle category and subcategory
+                if (!empty($equipment_data['category_name'])) {
+                    $category_stmt = $db->prepare("SELECT id FROM equipment_categories WHERE category_name = ?");
+                    $category_stmt->execute([$equipment_data['category_name']]);
+                    $category = $category_stmt->fetch();
+                    
+                    if ($category) {
+                        $equipment_data['category_id'] = $category['id'];
+                    } else {
+                        // Create new category if not exists
+                        $insert_category = $db->prepare("INSERT INTO equipment_categories (category_name) VALUES (?)");
+                        $insert_category->execute([$equipment_data['category_name']]);
+                        $equipment_data['category_id'] = $db->lastInsertId();
+                    }
+                    unset($equipment_data['category_name']);
+                }
+                
+                if (!empty($equipment_data['subcategory_name'])) {
+                    $subcategory_stmt = $db->prepare("SELECT id FROM equipment_subcategories WHERE subcategory_name = ? AND category_id = ?");
+                    $subcategory_stmt->execute([$equipment_data['subcategory_name'], $equipment_data['category_id']]);
+                    $subcategory = $subcategory_stmt->fetch();
+                    
+                    if ($subcategory) {
+                        $equipment_data['subcategory_id'] = $subcategory['id'];
+                    } else {
+                        // Create new subcategory if not exists
+                        $insert_subcategory = $db->prepare("INSERT INTO equipment_subcategories (subcategory_name, category_id) VALUES (?, ?)");
+                        $insert_subcategory->execute([$equipment_data['subcategory_name'], $equipment_data['category_id']]);
+                        $equipment_data['subcategory_id'] = $db->lastInsertId();
+                    }
+                    unset($equipment_data['subcategory_name']);
+                }
+                
+                // Set default values
+                if (empty($equipment_data['equipment_status'])) {
+                    $equipment_data['equipment_status'] = 'ใช้งานปกติ';
+                }
+                
+                // Format dates
+                if (!empty($equipment_data['purchase_date'])) {
+                    $equipment_data['purchase_date'] = date('Y-m-d', strtotime($equipment_data['purchase_date']));
+                }
+                if (!empty($equipment_data['warranty_expiry_date'])) {
+                    $equipment_data['warranty_expiry_date'] = date('Y-m-d', strtotime($equipment_data['warranty_expiry_date']));
+                }
+                
+                // Check for duplicate
+                $check_stmt = $db->prepare("SELECT id FROM equipment WHERE equipment_code = ?");
+                $check_stmt->execute([$equipment_data['equipment_code']]);
+                $existing = $check_stmt->fetch();
+                
+                if ($existing) {
+                    if ($duplicate_action == 'skip') {
+                        $results['skipped']++;
+                        continue;
+                    } elseif ($duplicate_action == 'update') {
+                        // Update existing equipment
+                        $update_fields = [];
+                        $update_params = [];
+                        
+                        foreach ($equipment_data as $field => $value) {
+                            if ($field != 'equipment_code') {
+                                $update_fields[] = "$field = ?";
+                                $update_params[] = $value;
+                            }
+                        }
+                        
+                        $update_params[] = $equipment_data['equipment_code'];
+                        $update_sql = "UPDATE equipment SET " . implode(', ', $update_fields) . " WHERE equipment_code = ?";
+                        $update_stmt = $db->prepare($update_sql);
+                        $update_stmt->execute($update_params);
+                        
+                        $results['success']++;
+                    }
+                } else {
+                    // Insert new equipment
+                    $fields = array_keys($equipment_data);
+                    $placeholders = str_repeat('?,', count($fields) - 1) . '?';
+                    
+                    $insert_sql = "INSERT INTO equipment (" . implode(', ', $fields) . ") VALUES ($placeholders)";
+                    $insert_stmt = $db->prepare($insert_sql);
+                    $insert_stmt->execute(array_values($equipment_data));
+                    
+                    $results['success']++;
+                }
+                
+            } catch (Exception $e) {
+                $results['errors'][] = "แถว $row_num: " . $e->getMessage();
+                $results['skipped']++;
+            }
+        }
+        fclose($handle);
+    }
+    
+    return $results;
+}
+
+// Function to import from Excel (simplified version)
+function importFromExcel($file_path, $duplicate_action, $db) {
+    $results = [
+        'total' => 0,
+        'success' => 0,
+        'skipped' => 0,
+        'errors' => []
+    ];
+    
+    try {
+        // For Excel files, we'll convert to CSV first for simplicity
+        // In production, you should use PhpSpreadsheet library
+        
+        // Simple conversion for demo purposes
+        $csv_file = $file_path . '.csv';
+        
+        // This is a simplified version - in real implementation use PhpSpreadsheet
+        $results['errors'][] = "การ Import ไฟล์ Excel ต้องการติดตั้ง PhpSpreadsheet library";
+        $results['errors'][] = "กรุณาใช้ไฟล์ CSV สำหรับการ Import ในขณะนี้";
+        
+    } catch (Exception $e) {
+        $results['errors'][] = "ข้อผิดพลาดในการอ่านไฟล์ Excel: " . $e->getMessage();
+    }
+    
+    return $results;
+}
+
 // นับจำนวนครุภัณฑ์ตามสถานะ
 try {
     $status_counts = $db->query("
@@ -294,8 +539,6 @@ try {
 } catch (PDOException $e) {
     $subcategories_all = [];
 }
-
-
 
 // สร้าง URL สำหรับ pagination (ต้องประกาศก่อนใช้งาน)
 function getPageUrl($page, $search, $filter_equipment_status) {
@@ -500,9 +743,14 @@ include 'includes/sidebar.php';
     <div class="container-fluid px-4">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">จัดการครุภัณฑ์</h1>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick="clearForm()">
-            <i class="fas fa-plus"></i> เพิ่มครุภัณฑ์
-        </button>
+        <div class="btn-group">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick="clearForm()">
+                <i class="fas fa-plus"></i> เพิ่มครุภัณฑ์
+            </button>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="fas fa-file-import"></i> Import
+            </button>
+        </div>
     </div>
 
     <?php if (isset($_SESSION['error'])): ?>
@@ -1083,568 +1331,96 @@ include 'includes/sidebar.php';
     </div>
 </div>
 
+<!-- Modal สำหรับ Import ครุภัณฑ์ -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" enctype="multipart/form-data" id="importForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importModalLabel">Import ครุภัณฑ์</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> คำแนะนำการ Import ข้อมูล</h6>
+                        <ul class="mb-0 small">
+                            <li>รองรับไฟล์ CSV (.csv) เท่านั้นในขณะนี้</li>
+                            <li>คอลัมน์ที่จำเป็น: <strong>รหัสครุภัณฑ์, ชื่อครุภัณฑ์</strong></li>
+                            <li>คอลัมน์เพิ่มเติม: หมวดหมู่, หมวดหมู่ย่อย, ยี่ห้อ, รุ่น, หมายเลขซีเรียล, วันที่ซื้อ, วันที่หมดประกัน, ราคาซื้อ, ผู้จำหน่าย, สถานะครุภัณฑ์, โรงเรียน, ตึก/อาคาร, ชั้น, ห้อง, ผู้รับผิดชอบ, หมายเหตุ</li>
+                            <li>ขนาดไฟล์ไม่เกิน 10MB</li>
+                            <li>รองรับการเข้ารหัส UTF-8</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">เลือกไฟล์ข้อมูล <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" name="import_file" id="import_file" accept=".csv" required>
+                        <div class="form-text">รองรับไฟล์ CSV (.csv) เท่านั้น</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">การจัดการข้อมูลซ้ำ</label>
+                        <select class="form-control" name="duplicate_action" id="duplicate_action">
+                            <option value="skip">ข้ามข้อมูลซ้ำ</option>
+                            <option value="update">อัพเดทข้อมูลที่มีอยู่</option>
+                        </select>
+                        <div class="form-text">เลือกวิธีการจัดการเมื่อพบรหัสครุภัณฑ์ซ้ำ</div>
+                    </div>
+
+                    <!-- Preview Area -->
+                    <div id="importPreview" class="mt-3" style="display: none;">
+                        <h6>ตัวอย่างข้อมูลที่จะ Import</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm" id="previewTable">
+                                <thead class="table-light">
+                                    <tr id="previewHeaders"></tr>
+                                </thead>
+                                <tbody id="previewBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted" id="previewInfo"></small>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div id="importProgress" class="mt-3" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <small id="progressText">กำลังประมวลผล...</small>
+                        </div>
+                    </div>
+
+                    <!-- Error Display -->
+                    <?php if (isset($_SESSION['import_errors']) && !empty($_SESSION['import_errors'])): ?>
+                    <div class="alert alert-warning mt-3">
+                        <h6><i class="fas fa-exclamation-triangle"></i> ข้อผิดพลาดในการ Import</h6>
+                        <ul class="mb-0 small">
+                            <?php foreach ($_SESSION['import_errors'] as $error): ?>
+                                <li><?php echo $error; ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    <?php unset($_SESSION['import_errors']); ?>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                    <button type="button" class="btn btn-warning" onclick="downloadTemplate()">
+                        <i class="fas fa-download"></i> ดาวน์โหลด Template
+                    </button>
+                    <button type="submit" class="btn btn-primary" name="import_equipment" id="importSubmit">
+                        <i class="fas fa-upload"></i> Import ข้อมูล
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php include 'includes/footer.php'; ?>
 
-<script>
-// เก็บข้อมูลหมวดหมู่ย่อยทั้งหมด
-const subcategories = <?php echo json_encode($subcategories_all); ?>;
-
-function updateSubcategories() {
-    const categoryId = document.getElementById('category_id').value;
-    const subcategorySelect = document.getElementById('subcategory_id');
-    
-    // ล้างตัวเลือกทั้งหมดยกเว้นตัวเลือกแรก
-    subcategorySelect.innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
-    
-    if (categoryId) {
-        // กรองหมวดหมู่ย่อยตามหมวดหมู่ที่เลือก
-        const filteredSubcategories = subcategories.filter(sub => sub.category_id == categoryId);
-        
-        filteredSubcategories.forEach(sub => {
-            const option = document.createElement('option');
-            option.value = sub.id;
-            option.textContent = sub.subcategory_name;
-            subcategorySelect.appendChild(option);
-        });
-    }
-}
-
-function clearForm() {
-    document.getElementById('equipmentForm').reset();
-    document.getElementById('equipment_id').value = '';
-    document.getElementById('current_equipment_image').value = '';
-    document.getElementById('imagePreview').innerHTML = '';
-    document.getElementById('equipmentModalLabel').textContent = 'เพิ่มครุภัณฑ์';
-    document.getElementById('submitButton').name = 'add_equipment';
-    document.getElementById('submitButton').textContent = 'บันทึก';
-    
-    // รีเซ็ตหมวดหมู่ย่อย
-    document.getElementById('subcategory_id').innerHTML = '<option value="">เลือกหมวดหมู่ย่อย</option>';
-}
-
-function editEquipment(equipment) {
-    document.getElementById('equipmentModalLabel').textContent = 'แก้ไขครุภัณฑ์';
-    document.getElementById('submitButton').name = 'edit_equipment';
-    document.getElementById('submitButton').textContent = 'อัพเดต';
-    
-    // ตั้งค่าฟิลด์ต่างๆ
-    document.getElementById('equipment_id').value = equipment.id;
-    document.getElementById('equipment_code').value = equipment.equipment_code;
-    document.getElementById('equipment_name').value = equipment.equipment_name;
-    document.getElementById('category_id').value = equipment.category_id;
-    
-    // อัพเดตหมวดหมู่ย่อยตามหมวดหมู่ที่เลือก
-    updateSubcategories();
-    
-    // ตั้งค่าหมวดหมู่ย่อยหลังจากอัพเดตตัวเลือกแล้ว
-    setTimeout(() => {
-        document.getElementById('subcategory_id').value = equipment.subcategory_id;
-    }, 100);
-    
-    document.getElementById('brand_name').value = equipment.brand_name || '';
-    document.getElementById('model_name').value = equipment.model_name || '';
-    document.getElementById('serial_number').value = equipment.serial_number || '';
-    document.getElementById('equipment_status').value = equipment.equipment_status;
-    document.getElementById('purchase_date').value = equipment.purchase_date || '';
-    document.getElementById('warranty_expiry_date').value = equipment.warranty_expiry_date || '';
-    document.getElementById('purchase_price').value = equipment.purchase_price || '';
-    document.getElementById('supplier_name').value = equipment.supplier_name || '';
-    document.getElementById('location_school').value = equipment.location_school || '';
-    document.getElementById('location_building').value = equipment.location_building || '';
-    document.getElementById('location_floor').value = equipment.location_floor || '';
-    document.getElementById('location_room').value = equipment.location_room || '';
-    document.getElementById('responsible_person').value = equipment.responsible_person || '';
-    document.getElementById('notes').value = equipment.notes || '';
-    document.getElementById('current_equipment_image').value = equipment.image_path || '';
-    
-    // แสดงรูปภาพถ้ามี
-    const imagePreview = document.getElementById('imagePreview');
-    imagePreview.innerHTML = '';
-    if (equipment.image_path) {
-        const img = document.createElement('img');
-        img.src = 'uploads/img_equipment/' + equipment.image_path;
-        img.alt = 'รูปครุภัณฑ์';
-        img.style.maxWidth = '200px';
-        img.style.maxHeight = '200px';
-        img.className = 'img-thumbnail';
-        imagePreview.appendChild(img);
-    }
-}
-
-function viewEquipment(equipment) {
-    const modalBody = document.getElementById('viewModalBody');
-    
-    let content = `
-        <div class="row">
-            <div class="col-md-4 text-center mb-3">
-    `;
-    
-    if (equipment.image_path) {
-        content += `
-            <img src="uploads/img_equipment/${equipment.image_path}" 
-                 alt="รูปครุภัณฑ์" 
-                 class="img-fluid rounded shadow-sm"
-                 style="max-height: 200px;">
-        `;
-    } else {
-        content += `
-            <div class="text-muted">
-                <i class="fas fa-image fa-3x mb-2"></i>
-                <br>ไม่มีรูปภาพ
-            </div>
-        `;
-    }
-    
-    content += `
-            </div>
-            <div class="col-md-8">
-                <table class="table table-bordered">
-                    <tr>
-                        <th width="40%">รหัสครุภัณฑ์</th>
-                        <td>${equipment.equipment_code}</td>
-                    </tr>
-                    <tr>
-                        <th>ชื่อครุภัณฑ์</th>
-                        <td>${equipment.equipment_name}</td>
-                    </tr>
-                    <tr>
-                        <th>หมวดหมู่</th>
-                        <td>${equipment.category_name || '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>หมวดหมู่ย่อย</th>
-                        <td>${equipment.subcategory_name || '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>ยี่ห้อ/รุ่น</th>
-                        <td>${equipment.brand_name || '-'} / ${equipment.model_name || '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>หมายเลขซีเรียล</th>
-                        <td>${equipment.serial_number || '-'}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-        
-        <div class="row mt-3">
-            <div class="col-md-6">
-                <table class="table table-bordered">
-                    <tr>
-                        <th width="40%">สถานะครุภัณฑ์</th>
-                        <td>
-                            <span class="badge bg-${getStatusBadgeColor(equipment.equipment_status)}">
-                                ${equipment.equipment_status}
-                            </span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>วันที่ซื้อ</th>
-                        <td>${equipment.purchase_date ? formatDate(equipment.purchase_date) : '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>วันที่หมดประกัน</th>
-                        <td>${equipment.warranty_expiry_date ? formatDate(equipment.warranty_expiry_date) : '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>ราคาซื้อ</th>
-                        <td>${equipment.purchase_price ? formatCurrency(equipment.purchase_price) : '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>ผู้จำหน่าย</th>
-                        <td>${equipment.supplier_name || '-'}</td>
-                    </tr>
-                </table>
-            </div>
-            <div class="col-md-6">
-                <table class="table table-bordered">
-                    <tr>
-                        <th width="40%">ตำแหน่งที่ตั้ง</th>
-                        <td>
-                            ${[equipment.location_building, equipment.location_floor ? 'ชั้น ' + equipment.location_floor : '', equipment.location_room].filter(Boolean).join(' / ') || '-'}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>โรงเรียน</th>
-                        <td>${equipment.location_school || '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>ผู้รับผิดชอบ</th>
-                        <td>${equipment.responsible_person || '-'}</td>
-                    </tr>
-                    <tr>
-                        <th>สถานะซ่อม</th>
-                        <td>
-                            <span class="badge bg-${getRepairStatusBadgeColor(equipment.repair_status)}">
-                                ${equipment.repair_status || 'ไม่มี'}
-                            </span>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-    `;
-    
-    if (equipment.notes) {
-        content += `
-            <div class="row mt-3">
-                <div class="col-12">
-                    <strong>หมายเหตุ:</strong>
-                    <div class="border p-2 rounded bg-light">${equipment.notes}</div>
-                </div>
-            </div>
-        `;
-    }
-    
-    modalBody.innerHTML = content;
-}
-
-function getStatusBadgeColor(status) {
-    const colors = {
-        'ใหม่': 'success',
-        'ใช้งานปกติ': 'primary',
-        'ชำรุด': 'warning',
-        'กำลังซ่อม': 'info',
-        'ซ่อมเสร็จแล้ว': 'success',
-        'จำหน่ายแล้ว': 'dark'
-    };
-    return colors[status] || 'secondary';
-}
-
-function getRepairStatusBadgeColor(status) {
-    const colors = {
-        'รอซ่อม': 'warning',
-        'กำลังดำเนินการ': 'info',
-        'ซ่อมเสร็จ': 'success',
-        'ยกเลิก': 'danger'
-    };
-    return colors[status] || 'secondary';
-}
-
-function formatDate(dateString) {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('th-TH');
-}
-
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('th-TH', {
-        style: 'currency',
-        currency: 'THB'
-    }).format(amount);
-}
-
-// แสดงตัวอย่างรูปภาพก่อนอัพโหลด
-document.getElementById('equipment_image').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    const preview = document.getElementById('imagePreview');
-    
-    preview.innerHTML = '';
-    
-    if (file) {
-        if (file.size > 5 * 1024 * 1024) {
-            alert('ขนาดไฟล์ต้องไม่เกิน 5MB');
-            e.target.value = '';
-            return;
-        }
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.alt = 'ตัวอย่างรูปภาพ';
-            img.style.maxWidth = '200px';
-            img.style.maxHeight = '200px';
-            img.className = 'img-thumbnail';
-            preview.appendChild(img);
-        }
-        reader.readAsDataURL(file);
-    }
-});
-
-// ป้องกันการส่งฟอร์มถ้ามีข้อผิดพลาด
-document.getElementById('equipmentForm').addEventListener('submit', function(e) {
-    const equipmentCode = document.getElementById('equipment_code').value.trim();
-    const equipmentName = document.getElementById('equipment_name').value.trim();
-    const categoryId = document.getElementById('category_id').value;
-    
-    if (!equipmentCode || !equipmentName || !categoryId) {
-        e.preventDefault();
-        alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
-        return;
-    }
-});
-
-// ==================== ฟังก์ชันใหม่สำหรับการกรองข้อมูล ====================
-
-// อัพเดตเวลาปัจจุบัน
-function updateCurrentTime() {
-    const now = new Date();
-    const options = { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit',
-        timeZone: 'Asia/Bangkok'
-    };
-    const formatter = new Intl.DateTimeFormat('th-TH', options);
-    document.getElementById('currentTime').textContent = 'อัพเดตล่าสุด: ' + formatter.format(now);
-}
-
-// เรียกอัพเดตเวลาทุก 1 นาที
-setInterval(updateCurrentTime, 60000);
-updateCurrentTime(); // เรียกครั้งแรก
-
-// ฟังก์ชันกรองข้อมูลแบบ real-time
-function filterTable() {
-    const globalSearch = document.getElementById('globalSearch').value.toLowerCase();
-    const equipmentStatus = document.getElementById('equipmentStatusFilter').value;
-    const repairStatus = document.getElementById('repairStatusFilter').value;
-    const school = document.getElementById('schoolFilter').value;
-    
-    const rows = document.querySelectorAll('#equipmentTableBody .equipment-row');
-    let visibleCount = 0;
-    
-    rows.forEach(row => {
-        const code = row.getAttribute('data-code').toLowerCase();
-        const name = row.getAttribute('data-name').toLowerCase();
-        const category = row.getAttribute('data-category').toLowerCase();
-        const subcategory = row.getAttribute('data-subcategory').toLowerCase();
-        const status = row.getAttribute('data-status');
-        const repair = row.getAttribute('data-repair-status');
-        const schoolData = row.getAttribute('data-school');
-        const building = row.getAttribute('data-building').toLowerCase();
-        const room = row.getAttribute('data-room').toLowerCase();
-        
-        let showRow = true;
-        
-        // กรองด้วยช่องค้นหาทั่วไป
-        if (globalSearch) {
-            const searchText = globalSearch;
-            if (!code.includes(searchText) && 
-                !name.includes(searchText) && 
-                !category.includes(searchText) && 
-                !subcategory.includes(searchText) &&
-                !building.includes(searchText) &&
-                !room.includes(searchText)) {
-                showRow = false;
-            }
-        }
-        
-        // กรองด้วยสถานะครุภัณฑ์
-        if (equipmentStatus && status !== equipmentStatus) {
-            showRow = false;
-        }
-        
-        // กรองด้วยสถานะซ่อม
-        if (repairStatus && repair !== repairStatus) {
-            showRow = false;
-        }
-        
-        // กรองด้วยโรงเรียน
-        if (school && schoolData !== school) {
-            showRow = false;
-        }
-        
-        // แสดง/ซ่อนแถว
-        if (showRow) {
-            row.style.display = '';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-    
-    // อัพเดตจำนวนผลลัพธ์
-    updateResultCount(visibleCount, rows.length);
-    
-    // แสดงข้อความเมื่อไม่พบผลลัพธ์
-    showNoResultsMessage(visibleCount);
-}
-
-// อัพเดตจำนวนผลลัพธ์
-function updateResultCount(visible, total) {
-    const totalCount = document.getElementById('totalCount');
-    const showingCount = document.getElementById('showingCount');
-    
-    totalCount.textContent = total.toLocaleString();
-    showingCount.textContent = visible.toLocaleString();
-    
-    // เปลี่ยนสีข้อความตามจำนวนผลลัพธ์
-    const resultCount = document.getElementById('resultCount');
-    if (visible === 0) {
-        resultCount.className = 'alert alert-danger py-2 mb-0';
-    } else if (visible < total) {
-        resultCount.className = 'alert alert-warning py-2 mb-0';
-    } else {
-        resultCount.className = 'alert alert-info py-2 mb-0';
-    }
-}
-
-// แสดงข้อความเมื่อไม่พบผลลัพธ์
-function showNoResultsMessage(visibleCount) {
-    let noResultsRow = document.querySelector('#equipmentTableBody tr:not(.equipment-row)');
-    
-    if (visibleCount === 0) {
-        if (!noResultsRow) {
-            noResultsRow = document.createElement('tr');
-            noResultsRow.innerHTML = `
-                <td colspan="8" class="text-center py-4">
-                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
-                    <h5 class="text-muted">ไม่พบข้อมูลครุภัณฑ์ที่ตรงกับเงื่อนไขการค้นหา</h5>
-                    <p class="text-muted">ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
-                    <button type="button" class="btn btn-primary" onclick="clearFilters()">
-                        ล้างตัวกรองทั้งหมด
-                    </button>
-                </td>
-            `;
-            document.getElementById('equipmentTableBody').appendChild(noResultsRow);
-        }
-    } else if (noResultsRow) {
-        noResultsRow.remove();
-    }
-}
-
-// ล้างตัวกรองทั้งหมด
-function clearFilters() {
-    document.getElementById('globalSearch').value = '';
-    document.getElementById('equipmentStatusFilter').value = '';
-    document.getElementById('repairStatusFilter').value = '';
-    document.getElementById('schoolFilter').value = '';
-    
-    filterTable();
-}
-
-// ส่งออกข้อมูลเป็น Excel
-function exportToExcel() {
-    const table = document.getElementById('equipmentTable');
-    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
-    
-    if (rows.length === 0) {
-        alert('ไม่มีข้อมูลที่จะส่งออก');
-        return;
-    }
-    
-    let csv = [];
-    const headers = [];
-    
-    // เพิ่มหัวข้อภาษาไทย
-    table.querySelectorAll('thead th').forEach(header => {
-        headers.push(header.textContent.trim());
-    });
-    
-    // เพิ่ม BOM สำหรับรองรับภาษาไทยใน Excel
-    const BOM = "\uFEFF";
-    csv.push(BOM + headers.join(','));
-    
-    // เพิ่มข้อมูล
-    rows.forEach(row => {
-        const rowData = [];
-        row.querySelectorAll('td').forEach(cell => {
-            let text = cell.textContent.trim();
-            
-            // ลบ HTML tags และจัดการกับเครื่องหมาย comma
-            text = text.replace(/,/g, ';');
-            text = text.replace(/\n/g, ' ');
-            text = text.replace(/\r/g, ' ');
-            
-            // ลบ badge text และเอาเฉพาะข้อความสถานะ
-            const badge = cell.querySelector('.badge');
-            if (badge) {
-                text = badge.textContent.trim();
-            }
-            
-            // จัดการกับข้อมูลการจำหน่าย
-            const smallText = cell.querySelector('small');
-            if (smallText) {
-                text += ' ' + smallText.textContent.trim();
-            }
-            
-            // ใส่ใน quotes เพื่อป้องกันปัญหา comma
-            rowData.push(`"${text}"`);
-        });
-        csv.push(rowData.join(','));
-    });
-    
-    // สร้างไฟล์และดาวน์โหลด
-    const csvString = csv.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    // ใช้ชื่อไฟล์ภาษาไทย
-    const today = new Date();
-    const dateString = today.toLocaleDateString('th-TH').replace(/\//g, '-');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `รายงานครุภัณฑ์_${dateString}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// พิมพ์ตาราง
-function printTable() {
-    const table = document.getElementById('equipmentTable');
-    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
-    
-    if (rows.length === 0) {
-        alert('ไม่มีข้อมูลที่จะพิมพ์');
-        return;
-    }
-    
-    const printWindow = window.open('', '_blank');
-    const currentDate = new Date().toLocaleDateString('th-TH');
-    
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>รายงานครุภัณฑ์</title>
-                <style>
-                    body { font-family: 'Sarabun', sans-serif; margin: 20px; }
-                    .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                    .print-header h2 { margin: 0; color: #333; }
-                    .print-info { margin: 10px 0; font-size: 14px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f8f9fa; font-weight: bold; }
-                    tr:nth-child(even) { background-color: #f8f9fa; }
-                    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-                    .no-print { display: none; }
-                    @media print {
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="print-header">
-                    <h2>รายงานครุภัณฑ์</h2>
-                    <div class="print-info">
-                        <strong>วันที่พิมพ์:</strong> ${currentDate} | 
-                        <strong>จำนวนรายการ:</strong> ${rows.length} รายการ
-                    </div>
-                </div>
-                ${table.outerHTML}
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(function() {
-                            window.close();
-                        }, 500);
-                    }
-                <\/script>
-            </body>
-        </html>
-    `);
-    
-    printWindow.document.close();
-}
-
-// เรียกใช้ฟังก์ชันกรองเมื่อโหลดหน้าเว็บเสร็จ
-document.addEventListener('DOMContentLoaded', function() {
-    filterTable(); // กรองข้อมูลครั้งแรก
-});
-</script>
+<script src="js/script-equipment.js"></script>

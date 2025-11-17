@@ -31,6 +31,7 @@
 
 <!-- Custom JS -->
 <script src="js/script.js"></script>
+<script src="js/script-importdata.js"></script>
 
 <script>
     // Global functions

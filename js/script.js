@@ -227,3 +227,5 @@ window.initializeChart = initializeChart;
 window.toggleSidebar = toggleSidebar;
 window.setSidebarState = setSidebarState;
 
+
+

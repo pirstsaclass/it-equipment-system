@@ -1,3 +1,4 @@
+
 <?php
 require_once 'includes/header.php';
 
@@ -231,6 +232,89 @@ include 'includes/sidebar.php';
         </div>
     </div>
 
+    <!-- Report Summary -->
+    <div class="row mb-4" id="summaryCards">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="totalCount"><?php echo count($report_data); ?></h4>
+                            <h6 class="card-title">จำนวนครุภัณฑ์</h6>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-box fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="totalValue">
+                                <?php 
+                                $total_value = array_sum(array_column($report_data, 'purchase_price'));
+                                echo number_format($total_value, 2); 
+                                ?>
+                            </h4>
+                            <h6 class="card-title">มูลค่ารวม</h6>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-money-bill-wave fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="newCount">
+                                <?php 
+                                $new_count = count(array_filter($report_data, function($item) {
+                                    return $item['equipment_status'] == 'ใหม่';
+                                }));
+                                echo $new_count;
+                                ?>
+                            </h4>
+                            <h6 class="card-title">ครุภัณฑ์ใหม่</h6>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-star fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="repairCount">
+                                <?php 
+                                $repair_count = count(array_filter($report_data, function($item) {
+                                    return $item['equipment_status'] == 'รอซ่อม';
+                                }));
+                                echo $repair_count;
+                                ?>
+                            </h4>
+                            <h6 class="card-title">รอซ่อม</h6>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-tools fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Filter Form -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
@@ -287,61 +371,6 @@ include 'includes/sidebar.php';
                     </div>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Report Summary -->
-    <div class="row mb-4" id="summaryCards">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <h6 class="card-title">จำนวนครุภัณฑ์</h6>
-                    <h4 id="totalCount"><?php echo count($report_data); ?></h4>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <h6 class="card-title">มูลค่ารวม</h6>
-                    <h4 id="totalValue">
-                        <?php 
-                        $total_value = array_sum(array_column($report_data, 'purchase_price'));
-                        echo number_format($total_value, 2); 
-                        ?>
-                    </h4>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <h6 class="card-title">ครุภัณฑ์ใหม่</h6>
-                    <h4 id="newCount">
-                        <?php 
-                        $new_count = count(array_filter($report_data, function($item) {
-                            return $item['equipment_status'] == 'ใหม่';
-                        }));
-                        echo $new_count;
-                        ?>
-                    </h4>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-white">
-                <div class="card-body">
-                    <h6 class="card-title">รอซ่อม</h6>
-                    <h4 id="repairCount">
-                        <?php 
-                        $repair_count = count(array_filter($report_data, function($item) {
-                            return $item['equipment_status'] == 'รอซ่อม';
-                        }));
-                        echo $repair_count;
-                        ?>
-                    </h4>
-                </div>
-            </div>
         </div>
     </div>
 
