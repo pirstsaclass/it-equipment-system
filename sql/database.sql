@@ -254,6 +254,8 @@ CREATE INDEX idx_equipment_classroom_id ON equipment_checks(equipment_classroom_
 CREATE INDEX idx_status ON equipment_checks(status);
 
 
+
+
 -- สร้างตาราง equipment_borrow (อัพเดทเพิ่มฟิลด์ lender_name)
 CREATE TABLE equipment_borrow (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสประวัติการยืม (Primary Key)',
@@ -293,10 +295,7 @@ UPDATE equipment
 SET borrow_status = 'ว่าง' 
 WHERE id NOT IN (SELECT equipment_id FROM equipment_borrow WHERE borrow_status = 'ยืมอยู่');
 
-
 -- ข้อมูลตัวอย่าง
-
-
 -- เพิ่มผู้ใช้งานระบบ
 
 INSERT INTO users (username, password, employee_id, full_name, role, is_active, last_login, created_at, updated_at) VALUES

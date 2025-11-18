@@ -1,5 +1,5 @@
 <?php
-// equipment_check_management.php
+// equipment_check.php
 require_once 'includes/header.php';
 
 // ตรวจสอบสิทธิ์การเข้าถึง
@@ -26,44 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$status, $notes, $check_id]);
             
             $_SESSION['success'] = "อัพเดทการตรวจสอบเรียบร้อยแล้ว";
-            header('Location: equipment_check_management.php');
+            header('Location: equipment_check.php');
             exit;
             
         } catch (PDOException $e) {
             $_SESSION['error'] = "เกิดข้อผิดพลาดในการอัพเดท: " . $e->getMessage();
-        }
-    }
-    
-    if ($form_action == 'delete_check') {
-        $check_id = intval($_POST['check_id']);
-        
-        try {
-            // ลบรูปภาพที่เกี่ยวข้องก่อน (ถ้ามี)
-            $stmt = $db->prepare("SELECT images FROM equipment_checks WHERE id = ?");
-            $stmt->execute([$check_id]);
-            $check_data = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($check_data && !empty($check_data['images'])) {
-                $images = json_decode($check_data['images'], true);
-                if (is_array($images)) {
-                    foreach ($images as $image_path) {
-                        if (file_exists($image_path)) {
-                            unlink($image_path);
-                        }
-                    }
-                }
-            }
-            
-            // ลบข้อมูลการตรวจสอบ
-            $stmt = $db->prepare("DELETE FROM equipment_checks WHERE id = ?");
-            $stmt->execute([$check_id]);
-            
-            $_SESSION['success'] = "ลบการตรวจสอบเรียบร้อยแล้ว";
-            header('Location: equipment_check_management.php');
-            exit;
-            
-        } catch (PDOException $e) {
-            $_SESSION['error'] = "เกิดข้อผิดพลาดในการลบ: " . $e->getMessage();
         }
     }
 }
@@ -90,31 +57,10 @@ if ($action == 'delete' && $id > 0) {
         $stmt = $db->prepare("DELETE FROM equipment_checks WHERE id = ?");
         $stmt->execute([$id]);
         $_SESSION['success'] = "ลบการตรวจสอบเรียบร้อยแล้ว";
-        header('Location: equipment_check_management.php');
+        header('Location: equipment_check.php');
         exit;
     } catch (PDOException $e) {
         $_SESSION['error'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
-    }
-}
-
-// ดึงข้อมูลสำหรับแก้ไข
-$check_data = [];
-if ($action == 'edit' && $id > 0) {
-    $stmt = $db->prepare("
-        SELECT ec.*, eqc.equipment_code, eq.equipment_name, 
-               eqc.school_name, eqc.building_name, eqc.floor_level, eqc.room_number, eqc.room_name
-        FROM equipment_checks ec
-        JOIN equipment_classroom eqc ON ec.equipment_classroom_id = eqc.id
-        LEFT JOIN equipment eq ON eqc.equipment_code = eq.equipment_code
-        WHERE ec.id = ?
-    ");
-    $stmt->execute([$id]);
-    $check_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$check_data) {
-        $_SESSION['error'] = "ไม่พบข้อมูลการตรวจสอบ";
-        header('Location: equipment_check_management.php');
-        exit;
     }
 }
 
@@ -221,8 +167,9 @@ $summary_stats = $summary_stmt->fetch(PDO::FETCH_ASSOC);
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <h1 class="h2">จัดการการตรวจสอบครุภัณฑ์</h1>
                 <div class="btn-group">
-                    <a href="equipment_check.php?action=dashboard" class="btn btn-outline-primary">
-                        <i class="fas fa-clipboard-check"></i> ตรวจสอบครุภัณฑ์
+                    <!-- เพิ่มปุ่มตรวจสอบอุปกรณ์ -->
+                    <a href="eq_check.html" class="btn btn-outline-primary">
+                        <i class="fas fa-clipboard-check"></i> ตรวจสอบอุปกรณ์
                     </a>
                     <a href="equipment_classroom.php" class="btn btn-outline-success">
                         <i class="fas fa-list"></i> จัดการครุภัณฑ์
@@ -439,7 +386,7 @@ $summary_stats = $summary_stmt->fetch(PDO::FETCH_ASSOC);
                                                         onclick="editCheck(<?php echo $item['id']; ?>)">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <a href="equipment_check_management.php?action=delete&id=<?php echo $item['id']; ?>" 
+                                                <a href="equipment_check.php?action=delete&id=<?php echo $item['id']; ?>" 
                                                    class="btn btn-danger" title="ลบ"
                                                    onclick="return confirm('คุณแน่ใจหรือไม่ที่จะลบการตรวจสอบนี้?')">
                                                     <i class="fas fa-trash"></i>
@@ -556,6 +503,10 @@ $summary_stats = $summary_stmt->fetch(PDO::FETCH_ASSOC);
 .table th {
     border-top: none;
     font-weight: 600;
+}
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
 }
 </style>
 

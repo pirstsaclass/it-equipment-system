@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบตรวจสอบอุปกรณ์ห้องเรียน</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Sarabun', sans-serif;
+        }
+        
+        body {
+            background: var(--gray-100);
+            padding: 16px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, var(--primary), #1e40af);
+            color: white;
+            padding: 24px 20px;
+            border-radius: 16px 16px 0 0;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        /* Scanner Section */
+        .scanner-section {
+            background: white;
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .scanner-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        
+        .scanner-btn:hover {
+            background: #1e40af;
+            transform: translateY(-2px);
+        }
+        
+        /* Equipment Info */
+        .equipment-info {
+            background: white;
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .info-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+        
+        .info-value {
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        
+        /* Inspection Form */
+        .form-section {
+            background: white;
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--gray-800);
+            font-size: 14px;
+        }
+        
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        /* Condition Options */
+        .condition-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .condition-option {
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .condition-option:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        .condition-option.selected {
+            border-color: var(--primary);
+            background: #eff6ff;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+        }
+        
+        .condition-option input {
+            display: none;
+        }
+        
+        .condition-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .condition-text {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Photo Upload */
+        .photo-upload {
+            border: 2px dashed var(--gray-200);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .photo-upload:hover {
+            border-color: var(--primary);
+            background: #f8fafc;
+        }
+        
+        .photo-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .photo-preview img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid var(--gray-200);
+        }
+        
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s;
+            margin-top: 8px;
+        }
+        
+        .submit-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+        
+        /* History Section */
+        .history-section {
+            background: white;
+            padding: 20px;
+            margin-top: 16px;
+            border-radius: 0 0 16px 16px;
+        }
+        
+        .history-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--gray-800);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .history-item {
+            padding: 16px;
+            background: var(--gray-100);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .history-semester {
+            font-weight: 600;
+            color: var(--gray-800);
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-normal { background: var(--success); color: white; }
+        .status-damaged { background: var(--warning); color: white; }
+        .status-repair { background: #f97316; color: white; }
+        .status-lost { background: var(--danger); color: white; }
+        
+        .history-details {
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+        
+        /* Scanner Modal */
+        .scanner-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .scanner-content {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+        }
+        
+        .scanner-placeholder {
+            width: 100%;
+            height: 300px;
+            background: var(--gray-200);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+            font-size: 48px;
+        }
+        
+        .close-btn {
+            background: var(--gray-600);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+        
+        /* Utility Classes */
+        .hidden {
+            display: none;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .mb-4 {
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--gray-600);
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔍 ระบบตรวจสอบอุปกรณ์</h1>
+            <p id="currentLocation">โรงเรียนตัวอย่าง</p>
+        </div>
+        
+        <!-- Scanner Section -->
+        <div class="scanner-section">
+            <button class="scanner-btn" onclick="openScanner()">
+                📷 สแกน QR Code อุปกรณ์
+            </button>
+        </div>
+        
+        <!-- Equipment Information -->
+        <div class="equipment-info hidden" id="equipmentInfo">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">รหัสอุปกรณ์:</span>
+                    <span class="info-value" id="equipmentCode">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ชื่ออุปกรณ์:</span>
+                    <span class="info-value" id="equipmentName">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ประเภท:</span>
+                    <span class="info-value" id="equipmentType">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ยี่ห้อ:</span>
+                    <span class="info-value" id="equipmentBrand">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">โรงเรียน:</span>
+                    <span class="info-value" id="schoolName">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">อาคาร:</span>
+                    <span class="info-value" id="buildingName">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ห้อง:</span>
+                    <span class="info-value" id="roomNumber">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ชื่อห้อง:</span>
+                    <span class="info-value" id="roomName">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Inspection Form -->
+        <div class="form-section hidden" id="inspectionForm">
+            <form id="inspectionDataForm">
+                <div class="form-group">
+                    <label class="form-label">📅 วันที่ตรวจสอบ</label>
+                    <input type="date" class="form-input" id="inspectionDate" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">👤 ผู้ตรวจสอบ</label>
+                    <input type="text" class="form-input" id="inspector" placeholder="กรอกชื่อผู้ตรวจสอบ" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">🔄 สภาพอุปกรณ์</label>
+                    <div class="condition-options">
+                        <label class="condition-option" onclick="selectCondition('ปกติ')">
+                            <input type="radio" name="condition" value="ปกติ" required>
+                            <div class="condition-icon">🟢</div>
+                            <div class="condition-text">ปกติ</div>
+                        </label>
+                        <label class="condition-option" onclick="selectCondition('ชำรุด')">
+                            <input type="radio" name="condition" value="ชำรุด">
+                            <div class="condition-icon">🟡</div>
+                            <div class="condition-text">ชำรุด</div>
+                        </label>
+                        <label class="condition-option" onclick="selectCondition('ซ่อมแซม')">
+                            <input type="radio" name="condition" value="ซ่อมแซม">
+                            <div class="condition-icon">🟠</div>
+                            <div class="condition-text">ซ่อมแซม</div>
+                        </label>
+                        <label class="condition-option" onclick="selectCondition('สูญหาย')">
+                            <input type="radio" name="condition" value="สูญหาย">
+                            <div class="condition-icon">🔴</div>
+                            <div class="condition-text">สูญหาย</div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">📝 รายละเอียดการตรวจสอบ</label>
+                    <textarea class="form-textarea" id="inspectionNotes" rows="3" placeholder="บันทึกข้อสังเกตเพิ่มเติม..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">📷 รูปภาพประกอบ</label>
+                    <div class="photo-upload" onclick="document.getElementById('photoInput').click()">
+                        <div>📁 คลิกเพื่ออัพโหลดรูปภาพ</div>
+                        <div style="font-size: 12px; color: var(--gray-600); margin-top: 4px;">
+                            อัพโหลดได้สูงสุด 5 รูป
+                        </div>
+                    </div>
+                    <input type="file" id="photoInput" accept="image/*" multiple hidden>
+                    <div class="photo-preview" id="photoPreview"></div>
+                </div>
+                
+                <button type="submit" class="submit-btn">
+                    💾 บันทึกผลการตรวจสอบ
+                </button>
+            </form>
+        </div>
+        
+        <!-- Inspection History -->
+        <div class="history-section hidden" id="historySection">
+            <div class="history-title">
+                📊 ประวัติการตรวจสอบ
+            </div>
+            <div class="history-list" id="inspectionHistory">
+                <!-- History will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- Scanner Modal -->
+        <div class="scanner-modal" id="scannerModal">
+            <div class="scanner-content">
+                <h3>สแกน QR Code</h3>
+                <p>นำกล้องไปที่ QR Code บนอุปกรณ์</p>
+                
+                <div class="scanner-placeholder">
+                    📷
+                </div>
+                
+                <p style="font-size: 14px; color: var(--gray-600); margin-bottom: 16px;">
+                    หรือป้อนรหัสอุปกรณ์ manually:
+                </p>
+                
+                <input type="text" class="form-input mb-4" id="manualCodeInput" placeholder="เช่น COM-001">
+                
+                <div>
+                    <button class="scanner-btn" onclick="searchEquipment()" style="margin-bottom: 8px;">
+                        🔍 ค้นหาอุปกรณ์
+                    </button>
+                    <button class="close-btn" onclick="closeScanner()">
+                        ปิด
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ตัวแปร global
+        let currentEquipment = null;
+        let selectedPhotos = [];
+
+        // ฟังก์ชันเปิด Scanner Modal
+        function openScanner() {
+            document.getElementById('scannerModal').style.display = 'flex';
+        }
+
+        // ฟังก์ชันปิด Scanner Modal
+        function closeScanner() {
+            document.getElementById('scannerModal').style.display = 'none';
+        }
+
+        // ฟังก์ชันค้นหาอุปกรณ์
+        async function searchEquipment() {
+            const equipmentCode = document.getElementById('manualCodeInput').value.trim();
+            if (!equipmentCode) {
+                alert('❌ กรุณาป้อนรหัสอุปกรณ์');
+                return;
+            }
+
+            await loadEquipmentData(equipmentCode);
+        }
+
+        // ฟังก์ชันโหลดข้อมูลอุปกรณ์จากฐานข้อมูล
+        async function loadEquipmentData(equipmentCode) {
+            try {
+                showLoading('กำลังโหลดข้อมูลอุปกรณ์...');
+                
+                const response = await fetch(`ajax_get_equipment_data.php?equipment_code=${encodeURIComponent(equipmentCode)}`);
+                const data = await response.json();
+                
+                if (data.success && data.equipment) {
+                    currentEquipment = data.equipment;
+                    
+                    // อัพเดทตำแหน่งปัจจุบัน
+                    const locationText = `${data.equipment.school_name} - ห้อง ${data.equipment.room_number}`;
+                    document.getElementById('currentLocation').textContent = locationText;
+                    
+                    loadEquipmentInfo();
+                    await loadInspectionHistory();
+                    closeScanner();
+                    
+                    // แสดงข้อความสำเร็จ
+                    showMessage('✅ โหลดข้อมูลอุปกรณ์เรียบร้อยแล้ว', 'success');
+                } else {
+                    throw new Error(data.message || 'ไม่พบข้อมูลอุปกรณ์');
+                }
+            } catch (error) {
+                console.error('Error loading equipment:', error);
+                showMessage('❌ ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ฟังก์ชันโหลดข้อมูลอุปกรณ์
+        function loadEquipmentInfo() {
+            if (!currentEquipment) return;
+            
+            document.getElementById('equipmentCode').textContent = currentEquipment.equipment_code || '-';
+            document.getElementById('equipmentName').textContent = currentEquipment.equipment_name || '-';
+            document.getElementById('equipmentType').textContent = currentEquipment.equipment_type || '-';
+            document.getElementById('equipmentBrand').textContent = currentEquipment.equipment_brand || '-';
+            document.getElementById('schoolName').textContent = currentEquipment.school_name || '-';
+            document.getElementById('buildingName').textContent = currentEquipment.building_name || '-';
+            document.getElementById('roomNumber').textContent = currentEquipment.room_number || '-';
+            document.getElementById('roomName').textContent = currentEquipment.room_name || '-';
+            
+            // แสดงส่วนที่เกี่ยวข้อง
+            document.getElementById('equipmentInfo').classList.remove('hidden');
+            document.getElementById('inspectionForm').classList.remove('hidden');
+            document.getElementById('historySection').classList.remove('hidden');
+            
+            // ตั้งค่าวันที่ปัจจุบัน
+            document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+        }
+
+        // ฟังก์ชันเลือกสภาพอุปกรณ์
+        function selectCondition(condition) {
+            // ล้างการเลือกทั้งหมด
+            document.querySelectorAll('.condition-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            // เลือกสภาพที่กด
+            event.currentTarget.classList.add('selected');
+            
+            // เช็ค radio button
+            const radio = event.currentTarget.querySelector('input[type="radio"]');
+            radio.checked = true;
+        }
+
+        // ฟังก์ชันโหลดประวัติการตรวจสอบ
+        async function loadInspectionHistory() {
+            if (!currentEquipment) return;
+            
+            try {
+                const historyContainer = document.getElementById('inspectionHistory');
+                historyContainer.innerHTML = '<div class="loading">กำลังโหลดประวัติ...</div>';
+                
+                const response = await fetch(`ajax_get_check_history.php?equipment_code=${encodeURIComponent(currentEquipment.equipment_code)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const history = data.history || [];
+                    displayInspectionHistory(history);
+                } else {
+                    throw new Error(data.message || 'ไม่สามารถโหลดประวัติได้');
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+                document.getElementById('inspectionHistory').innerHTML = 
+                    '<div class="error-message">❌ ' + error.message + '</div>';
+            }
+        }
+
+        // ฟังก์ชันแสดงประวัติการตรวจสอบ
+        function displayInspectionHistory(history) {
+            const historyContainer = document.getElementById('inspectionHistory');
+            
+            if (history.length === 0) {
+                historyContainer.innerHTML = '<div class="text-center" style="color: var(--gray-600);">ไม่มีประวัติการตรวจสอบ</div>';
+                return;
+            }
+            
+            historyContainer.innerHTML = '';
+            
+            history.forEach(record => {
+                const statusClass = getStatusClass(record.status);
+                const statusText = record.status;
+                
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.innerHTML = `
+                    <div class="history-header">
+                        <span class="history-semester">${formatDate(record.check_date)}</span>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="history-details">
+                        <div>👤 โดย ${record.checked_by}</div>
+                        ${record.notes ? `<div style="margin-top: 4px;">📝 ${record.notes}</div>` : ''}
+                        <div style="margin-top: 4px; font-size: 12px; color: var(--gray-500);">
+                            📅 บันทึกเมื่อ ${formatDateTime(record.created_at)}
+                        </div>
+                    </div>
+                `;
+                historyContainer.appendChild(historyItem);
+            });
+        }
+
+        // ฟังก์ชันจัดการอัพโหลดรูปภาพ
+        document.getElementById('photoInput').addEventListener('change', function(e) {
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = '';
+            selectedPhotos = [];
+            
+            Array.from(e.target.files).slice(0, 5).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    selectedPhotos.push(file);
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.onclick = () => removePhoto(file);
+                        preview.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+
+        // ฟังก์ชันลบรูปภาพ
+        function removePhoto(fileToRemove) {
+            selectedPhotos = selectedPhotos.filter(file => file !== fileToRemove);
+            updatePhotoPreview();
+        }
+
+        // ฟังก์ชันอัพเดทแสดงรูปภาพ
+        function updatePhotoPreview() {
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = '';
+            
+            selectedPhotos.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.onclick = () => removePhoto(file);
+                    preview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ฟังก์ชันจัดการการส่งฟอร์ม
+        document.getElementById('inspectionDataForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!currentEquipment) {
+                showMessage('❌ กรุณาสแกน QR Code อุปกรณ์ก่อน', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('equipment_classroom_id', currentEquipment.id);
+            formData.append('check_date', document.getElementById('inspectionDate').value);
+            formData.append('checked_by', document.getElementById('inspector').value);
+            formData.append('status', document.querySelector('input[name="condition"]:checked').value);
+            formData.append('notes', document.getElementById('inspectionNotes').value);
+            
+            // เพิ่มรูปภาพ
+            selectedPhotos.forEach(photo => {
+                formData.append('images[]', photo);
+            });
+            
+            try {
+                showLoading('กำลังบันทึกข้อมูล...');
+                
+                const response = await fetch('ajax_save_equipment_check.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('✅ บันทึกผลการตรวจสอบเรียบร้อยแล้ว!', 'success');
+                    
+                    // รีเซ็ตฟอร์ม
+                    this.reset();
+                    selectedPhotos = [];
+                    document.getElementById('photoPreview').innerHTML = '';
+                    document.querySelectorAll('.condition-option').forEach(opt => opt.classList.remove('selected'));
+                    
+                    // ตั้งค่าวันที่ปัจจุบันใหม่
+                    document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+                    
+                    // โหลดประวัติใหม่
+                    await loadInspectionHistory();
+                } else {
+                    throw new Error(result.message || 'เกิดข้อผิดพลาดในการบันทึก');
+                }
+            } catch (error) {
+                console.error('Error saving inspection:', error);
+                showMessage('❌ ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // ฟังก์ชันช่วยเหลือ
+        function getStatusClass(status) {
+            const statusClasses = {
+                'ปกติ': 'status-normal',
+                'ชำรุด': 'status-damaged',
+                'ซ่อมแซม': 'status-repair',
+                'สูญหาย': 'status-lost'
+            };
+            return statusClasses[status] || 'status-normal';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('th-TH', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+
+        function formatDateTime(dateTimeString) {
+            const date = new Date(dateTimeString);
+            return date.toLocaleDateString('th-TH', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function showLoading(message) {
+            let loadingEl = document.getElementById('loadingOverlay');
+            if (!loadingEl) {
+                loadingEl = document.createElement('div');
+                loadingEl.id = 'loadingOverlay';
+                loadingEl.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 9999;
+                    color: white;
+                    font-size: 18px;
+                `;
+                document.body.appendChild(loadingEl);
+            }
+            loadingEl.innerHTML = `<div>${message}</div>`;
+        }
+
+        function hideLoading() {
+            const loadingEl = document.getElementById('loadingOverlay');
+            if (loadingEl) {
+                loadingEl.remove();
+            }
+        }
+
+        function showMessage(message, type) {
+            // ล้างข้อความเก่า
+            const oldMessage = document.getElementById('messageOverlay');
+            if (oldMessage) {
+                oldMessage.remove();
+            }
+            
+            const messageEl = document.createElement('div');
+            messageEl.id = 'messageOverlay';
+            messageEl.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+                z-index: 9999;
+                max-width: 90%;
+                text-align: center;
+            `;
+            
+            if (type === 'success') {
+                messageEl.style.background = '#d1fae5';
+                messageEl.style.color = '#065f46';
+                messageEl.style.border = '2px solid #10b981';
+            } else {
+                messageEl.style.background = '#fee2e2';
+                messageEl.style.color = '#dc2626';
+                messageEl.style.border = '2px solid #ef4444';
+            }
+            
+            messageEl.textContent = message;
+            document.body.appendChild(messageEl);
+            
+            // ลบข้อความหลังจาก 3 วินาที
+            setTimeout(() => {
+                if (messageEl.parentNode) {
+                    messageEl.remove();
+                }
+            }, 3000);
+        }
+
+        // Manual code input
+        document.getElementById('manualCodeInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchEquipment();
+            }
+        });
+
+        // ตั้งค่าวันที่ปัจจุบันเมื่อโหลดหน้า
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('inspectionDate').value = new Date().toISOString().split('T')[0];
+        });
+    </script>
+</body>
+</html>
