@@ -39,6 +39,12 @@
                                 จำหน่ายครุภัณฑ์
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'borrow.php' ? 'active' : ''; ?>" href="borrow.php" style="padding: 0.5rem 1.5rem 0.5rem 2.5rem; font-size: 1rem;">
+                                <i class="fas fa-hand-holding me-2" style="font-size: 0.95rem;"></i> 
+                                ยืม-คืนอุปกรณ์
+                            </a>
+                        </li>
                     </ul>
                     <?php endif; ?>
 
@@ -75,6 +81,10 @@
                             <a class="nav-link sidebar-submenu <?php echo basename($_SERVER['PHP_SELF']) == 'equipment_classroom.php' ? 'active' : ''; ?>" href="equipment_classroom.php" style="padding: 0.5rem 1.5rem 0.5rem 2.5rem; font-size: 1rem;">
                                 <i class="fas fa-chalkboard-teacher me-2" style="font-size: 0.95rem;"></i>
                                 อุปกรณ์ในห้องเรียน
+                            </a>
+                             <a class="nav-link" href="equipment_check.php?action=dashboard">
+                                <i class="fas fa-clipboard-check"></i>
+                                <span>ตรวจสอบครุภัณฑ์</span>
                             </a>
                         </li>
                         <?php endif; ?>

@@ -73,9 +73,7 @@ include 'includes/sidebar.php';
 <div id="layoutSidenav_content">
 <!-- Main Content -->
     <main >
-    <div class="container-fluid px-4">
-
-
+<div class="container-fluid px-4">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">จัดการแผนก</h1>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#departmentModal" onclick="clearForm()">

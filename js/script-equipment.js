@@ -310,6 +310,8 @@ function updateCurrentTime() {
 setInterval(updateCurrentTime, 60000);
 updateCurrentTime(); // เรียกครั้งแรก
 
+
+
 // ฟังก์ชันกรองข้อมูลแบบ real-time
 function filterTable() {
     const globalSearch = document.getElementById('globalSearch').value.toLowerCase();

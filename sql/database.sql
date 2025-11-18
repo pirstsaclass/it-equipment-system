@@ -231,6 +231,67 @@ CREATE TABLE calendar_events (
 );
 
 
+-- ตารางฐานข้อมูลเพิ่มใหม่
+
+
+-- ตารางบันทึกการตรวจสอบอุปกรณ์
+CREATE TABLE IF NOT EXISTS equipment_checks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    equipment_classroom_id INT NOT NULL,
+    checked_by VARCHAR(100) NOT NULL,
+    check_date DATETIME NOT NULL,
+    status ENUM('ปกติ', 'ชำรุด', 'ซ่อมแซม', 'สูญหาย') NOT NULL,
+    notes TEXT,
+    images JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (equipment_classroom_id) REFERENCES equipment_classroom(id) ON DELETE CASCADE
+);
+
+-- สร้าง index เพื่อเพิ่มประสิทธิภาพ
+CREATE INDEX idx_check_date ON equipment_checks(check_date);
+CREATE INDEX idx_equipment_classroom_id ON equipment_checks(equipment_classroom_id);
+CREATE INDEX idx_status ON equipment_checks(status);
+
+
+-- สร้างตาราง equipment_borrow (อัพเดทเพิ่มฟิลด์ lender_name)
+CREATE TABLE equipment_borrow (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT 'รหัสประวัติการยืม (Primary Key)',
+    equipment_id INT NOT NULL COMMENT 'รหัสอุปกรณ์ (Foreign Key เชื่อมโยงตาราง equipment)',
+    borrower_name VARCHAR(255) NOT NULL COMMENT 'ชื่อผู้ยืมอุปกรณ์',
+    borrower_department VARCHAR(255) COMMENT 'แผนก/หน่วยงานของผู้ยืม',
+    lender_name VARCHAR(255) COMMENT 'ชื่อผู้ให้ยืมอุปกรณ์',
+    borrow_date DATE NOT NULL COMMENT 'วันที่ยืมอุปกรณ์',
+    expected_return_date DATE NOT NULL COMMENT 'วันที่กำหนดคืนอุปกรณ์',
+    actual_return_date DATE NULL COMMENT 'วันที่คืนอุปกรณ์จริง (NULL ถ้ายังไม่คืน)',
+    borrow_purpose TEXT COMMENT 'วัตถุประสงค์การยืม',
+    notes TEXT COMMENT 'หมายเหตุเพิ่มเติม',
+    borrow_status ENUM('ยืมอยู่', 'คืนแล้ว', 'เกินกำหนด') DEFAULT 'ยืมอยู่' COMMENT 'สถานะการยืม: ยืมอยู่, คืนแล้ว, เกินกำหนด',
+    created_by INT COMMENT 'รหัสผู้บันทึกข้อมูล (เชื่อมโยงตาราง users)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'วันที่สร้างบันทึก',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'วันที่อัพเดทบันทึกล่าสุด',
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE 
+);
+
+-- สร้าง INDEX เพื่อเพิ่มประสิทธิภาพ
+CREATE INDEX idx_equipment_borrow_status ON equipment_borrow(borrow_status) COMMENT 'INDEX สำหรับค้นหาตามสถานะการยืม';
+CREATE INDEX idx_equipment_borrow_dates ON equipment_borrow(borrow_date, expected_return_date) COMMENT 'INDEX สำหรับค้นหาตามวันที่ยืมและกำหนดคืน';
+CREATE INDEX idx_equipment_borrow_equipment_id ON equipment_borrow(equipment_id) COMMENT 'INDEX สำหรับค้นหาตามรหัสอุปกรณ์';
+CREATE INDEX idx_equipment_borrow_borrower ON equipment_borrow(borrower_name) COMMENT 'INDEX สำหรับค้นหาตามชื่อผู้ยืม';
+CREATE INDEX idx_equipment_borrow_lender ON equipment_borrow(lender_name) COMMENT 'INDEX สำหรับค้นหาตามชื่อผู้ให้ยืม';
+
+-- เพิ่มคอลัมน์สถานะการยืมในตาราง equipment (ถ้ายังไม่มี)
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS borrow_status ENUM('ว่าง', 'ถูกยืม') DEFAULT 'ว่าง';
+
+-- อัพเดทสถานะครุภัณฑ์ที่มีการยืมอยู่
+UPDATE equipment 
+SET borrow_status = 'ถูกยืม' 
+WHERE id IN (SELECT equipment_id FROM equipment_borrow WHERE borrow_status = 'ยืมอยู่');
+
+-- อัพเดทสถานะครุภัณฑ์ที่ว่าง
+UPDATE equipment 
+SET borrow_status = 'ว่าง' 
+WHERE id NOT IN (SELECT equipment_id FROM equipment_borrow WHERE borrow_status = 'ยืมอยู่');
 
 
 -- ข้อมูลตัวอย่าง
